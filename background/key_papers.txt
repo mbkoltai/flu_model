@@ -1,9 +1,0 @@
-key publications:
-WHO PPC https://apps.who.int/iris/bitstream/handle/10665/258767/9789241512466-eng.pdf
-strategic plan NIAID https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6279170/
-Global Infiluenza strategy, WHO https://apps.who.int/iris/bitstream/handle/10665/311184/9789241515320-eng.pdf?sequence=18&isAllowed=y
-National influenza modernaisation strategy: https://www.phe.gov/Preparedness/planning/nivms/Pages/default.aspx
-CIDRAP Influenza vaccine r and d roadmap https://ivr.cidrap.umn.edu/sites/default/files/banner-download/IVR_Final_9_20_21.pdf
-vaccine reserach and edvelopment report https://www.ncbi.nlm.nih.gov/books/NBK578844/
-
-(Naomi Waterlow 01/Jul/2022 09:34)

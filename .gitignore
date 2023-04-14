@@ -1,0 +1,5 @@
+# gitignore
+.Rhistory
+background/
+output/plots/
+refresh_gitignore.sh
