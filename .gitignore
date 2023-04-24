@@ -2,6 +2,8 @@
 .Rhistory
 background/
 output/plots/
-refresh_gitignore.sh
+# refresh_gitignore.sh
 data/VIW_FID_EPI.csv
-.Rproj.user
+.Rproj.user/
+.RData
+
