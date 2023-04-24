@@ -4,3 +4,4 @@ background/
 output/plots/
 refresh_gitignore.sh
 data/VIW_FID_EPI.csv
+.Rproj.user
