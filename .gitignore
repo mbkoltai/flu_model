@@ -6,4 +6,4 @@ output/plots/
 data/VIW_FID_EPI.csv
 .Rproj.user/
 .RData
-
+data/~lock*
