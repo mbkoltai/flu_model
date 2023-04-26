@@ -1,0 +1,110 @@
+country,kmeans_cluster_num,kmeans_cluster_name,hi_cluster_ward_num,hi_cluster_ward_name
+Uruguay,1,Southern America,1,Southern America
+Argentina,1,Southern America,1,Southern America
+Bolivia,1,Southern America,1,Southern America
+Brazil,1,Southern America,1,Southern America
+Colombia,1,Southern America,1,Southern America
+French Guiana,1,Southern America,1,Southern America
+Panama,1,Southern America,1,Southern America
+Chile,1,Southern America,1,Southern America
+Paraguay,1,Southern America,1,Southern America
+Jamaica,1,Southern America,1,Southern America
+Venezuela,1,Southern America,1,Southern America
+Suriname,1,Southern America,1,Southern America
+Dominican Republic,1,Southern America,1,Southern America
+El Salvador,1,Southern America,1,Southern America
+Haiti,1,Southern America,1,Southern America
+Costa Rica,1,Southern America,1,Southern America
+Ecuador,2,Northern America,1,Southern America
+Honduras,2,Northern America,2,Northern America
+Nicaragua,2,Northern America,2,Northern America
+Peru,2,Northern America,2,Northern America
+Cuba,2,Northern America,2,Northern America
+Belize,2,Northern America,2,Northern America
+Canada,2,Northern America,2,Northern America
+United States,2,Northern America,2,Northern America
+Guatemala,2,Northern America,2,Northern America
+Mexico,2,Northern America,2,Northern America
+Fiji,3,Oceania-Melanesia-Polynesia,3,Oceania-Melanesia-Polynesia
+Australia,3,Oceania-Melanesia-Polynesia,3,Oceania-Melanesia-Polynesia
+New Caledonia,3,Oceania-Melanesia-Polynesia,3,Oceania-Melanesia-Polynesia
+Papua New Guinea,4,Eastern and Southern Asia,3,Oceania-Melanesia-Polynesia
+Nepal,4,Eastern and Southern Asia,4,Eastern and Southern Asia
+Singapore,4,Eastern and Southern Asia,4,Eastern and Southern Asia
+Philippines,4,Eastern and Southern Asia,4,Eastern and Southern Asia
+Laos,4,Eastern and Southern Asia,4,Eastern and Southern Asia
+Cambodia,4,Eastern and Southern Asia,4,Eastern and Southern Asia
+Thailand,4,Eastern and Southern Asia,4,Eastern and Southern Asia
+Russia,4,Eastern and Southern Asia,4,Eastern and Southern Asia
+Mongolia,4,Eastern and Southern Asia,4,Eastern and Southern Asia
+China,4,Eastern and Southern Asia,4,Eastern and Southern Asia
+Republic of Korea,4,Eastern and Southern Asia,4,Eastern and Southern Asia
+Bangladesh,4,Eastern and Southern Asia,4,Eastern and Southern Asia
+Bhutan,4,Eastern and Southern Asia,4,Eastern and Southern Asia
+Maldives,4,Eastern and Southern Asia,4,Eastern and Southern Asia
+India,4,Eastern and Southern Asia,4,Eastern and Southern Asia
+Sri Lanka,4,Eastern and Southern Asia,4,Eastern and Southern Asia
+Viet Nam,4,Eastern and Southern Asia,4,Eastern and Southern Asia
+Malaysia,4,Eastern and Southern Asia,4,Eastern and Southern Asia
+Indonesia,4,Eastern and Southern Asia,4,Eastern and Southern Asia
+Cote d'Ivoire,5,Africa,5,Africa
+Ghana,5,Africa,5,Africa
+Burkina Faso,5,Africa,5,Africa
+Niger,5,Africa,5,Africa
+Senegal,5,Africa,5,Africa
+Sierra Leone,5,Africa,5,Africa
+Cameroon,5,Africa,5,Africa
+Togo,5,Africa,5,Africa
+Mali,5,Africa,5,Africa
+Nigeria,5,Africa,5,Africa
+Kenya,5,Africa,5,Africa
+Central African Republic,5,Africa,5,Africa
+Uganda,5,Africa,5,Africa
+Mauritius,5,Africa,5,Africa
+Zambia,5,Africa,5,Africa
+South Africa,5,Africa,5,Africa
+Madagascar,5,Africa,5,Africa
+Mozambique,5,Africa,5,Africa
+Bulgaria,6,Europe,6,Europe
+Greece,6,Europe,6,Europe
+Austria,6,Europe,6,Europe
+Slovenia,6,Europe,6,Europe
+Poland,6,Europe,6,Europe
+Slovakia,6,Europe,6,Europe
+Ukraine,6,Europe,6,Europe
+Finland,6,Europe,6,Europe
+Estonia,6,Europe,6,Europe
+Belarus,6,Europe,6,Europe
+Lithuania,6,Europe,6,Europe
+Malta,6,Europe,6,Europe
+Spain,6,Europe,6,Europe
+Morocco,6,Europe,6,Europe
+Norway,6,Europe,6,Europe
+France,6,Europe,6,Europe
+Netherlands,6,Europe,6,Europe
+Denmark,6,Europe,6,Europe
+Germany,6,Europe,6,Europe
+Iceland,6,Europe,6,Europe
+Ireland,6,Europe,6,Europe
+United Kingdom,6,Europe,6,Europe
+Afghanistan,7,Asia-Europe,7,Asia-Europe
+Pakistan,7,Asia-Europe,7,Asia-Europe
+Kazakhstan,7,Asia-Europe,7,Asia-Europe
+Kyrgyzstan,7,Asia-Europe,7,Asia-Europe
+Armenia,7,Asia-Europe,7,Asia-Europe
+Iran,7,Asia-Europe,7,Asia-Europe
+Azerbaijan,7,Asia-Europe,7,Asia-Europe
+Georgia,7,Asia-Europe,7,Asia-Europe
+Jordan,7,Asia-Europe,7,Asia-Europe
+Lebanon,7,Asia-Europe,7,Asia-Europe
+Turkey,7,Asia-Europe,7,Asia-Europe
+Iraq,7,Asia-Europe,7,Asia-Europe
+Bahrain,7,Asia-Europe,7,Asia-Europe
+Kuwait,7,Asia-Europe,7,Asia-Europe
+Oman,7,Asia-Europe,7,Asia-Europe
+Qatar,7,Asia-Europe,7,Asia-Europe
+Rwanda,7,Asia-Europe,7,Asia-Europe
+Democratic Republic of the Congo,5,Africa,7,Asia-Europe
+United Republic of Tanzania,5,Africa,7,Asia-Europe
+Egypt,7,Asia-Europe,7,Asia-Europe
+Ethiopia,5,Africa,7,Asia-Europe
