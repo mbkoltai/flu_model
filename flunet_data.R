@@ -2,7 +2,7 @@
 # FluNet data
 
 # load libraries, functions
-source("fcns.R")
+source("fcns/fcns.R")
 
 # LOAD DATA
 # FLUNET
@@ -12,7 +12,7 @@ cntr_pop_2020 = pop[-(1:29),] %>% select(name,`2020`) %>% rename(pop_size=`2020`
   mutate(pop_size=round(pop_size/1e3,2)) %>% rename(COUNTRY_AREA_TERRITORY=name)
 
 # number of datapoints or mean positives (by year) by COUNTRY, YEAR, ORIGIN_SOURCE
-# my_colors <- c("NOTDEFINED"="#F8766D","NONSENTINEL"="#00BA38","SENTINEL"="#619CFF")
+# source_colors <- c("NOTDEFINED"="#F8766D","NONSENTINEL"="#00BA38","SENTINEL"="#619CFF")
 k_var=1; pop_lim=20
 for (k_reg in unique(flunet_data$WHOREGION)) {
   plot_var=c("mean_inf_all","n_data")[k_var]
@@ -44,7 +44,7 @@ cor(flunet_data$SPEC_RECEIVED_NB, flunet_data$SPEC_PROCESSED_NB,use = "complete.
 
 
 # time courses, data source types by diff colors
-my_colors <- c("NOTDEFINED"="#F8766D","NONSENTINEL"="#00BA38","SENTINEL"="#619CFF")
+source_colors <- c("NOTDEFINED"="#F8766D","NONSENTINEL"="#00BA38","SENTINEL"="#619CFF")
 pop_lim=20; flag_positivity=T
 for (k_reg in unique(flunet_data$WHOREGION)) {
   varname <- ifelse(flag_positivity,"positivity","INF_ALL")
@@ -82,7 +82,7 @@ for (k_reg in unique(flunet_data$WHOREGION)) {
     geom_text(data=max_df,show.legend=FALSE,aes(x=40+3*as.numeric(factor(ORIGIN_SOURCE)),y=0.9*max_cntr,
                         label=paste0(n_year,ifelse(as.numeric(factor(ORIGIN_SOURCE))<3,", ","")),
                         color=factor(ORIGIN_SOURCE))) +
-    scale_color_manual(values=my_colors) + scale_x_continuous(expand=expansion(0.01,0)) + 
+    scale_color_manual(values=source_colors) + scale_x_continuous(expand=expansion(0.01,0)) + 
     ylab(ifelse(flag_positivity,"positivity","# positives")) +  theme_bw() + standard_theme
   # save
   ggsave(paste0("output/plots/",ifelse(positivity,"positivity/","incidence/"),
@@ -360,7 +360,7 @@ subset_flunet %>% filter(positivity<=1 | is.na(positivity)) %>%
   theme_bw() + standard_theme + theme(legend.position="top",legend.text=element_text(size=16))
 # save
 ggsave(paste0("output/plots/cluster/",k_method,"/",
-              gsub("value","incidence",varname),"/cntrs_sep_lines.png"), 
+              gsub("value","incidence",varname),"/cntrs_sep_lines.png"),
        width=36,height=24,units="cm")
 }
 
@@ -424,72 +424,203 @@ if (!CI_50_FLAG) {
 ggsave(paste0("output/plots/cluster/",k_method,"/",gsub("value","incidence",varname),
               "/cntrs_",gsub("_all","",mean_median_varname),"_CI",ifelse(CI_50_FLAG,"50","50_95"),".png"), 
        width=36,height=24,units="cm")
-} # mean/median
-}
+  } # mean/median
+} # clustering method
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
 # choose 'exemplar' countries
 
-strain_colors <- c("INF_A (NOTDEF)"="#F8766D","INF_A (NONSENT)"="darkred","INF_A (SENT)"="orange",
-                   "INF_B (NOTDEF)"="#00BA38","INF_B (NONSENT)"="darkgreen","INF_B (SENT)"="turquoise")
+# strain_colors <- c("INF_A (NOTDEF)"="#F8766D","INF_A (NONSENT)"="darkred","INF_A (SENT)"="orange",
+#                    "INF_B (NOTDEF)"="#00BA38","INF_B (NONSENT)"="darkgreen","INF_B (SENT)"="turquoise")
+source_colors <- c("NOTDEFINED"="#F8766D","NONSENTINEL"="#00BA38","SENTINEL"="#619CFF")
+### ### ###
 
-# how many years of data by ITZ?
-data_by_ITZ <-  left_join(flunet_data %>% 
-                            mutate(COUNTRY_AREA_TERRITORY=ifelse(grepl("United Kingdom",COUNTRY_AREA_TERRITORY),
-                                                                 "United Kingdom",COUNTRY_AREA_TERRITORY),
-                                   COUNTRY_CODE=ifelse(grepl("United Kingdom",COUNTRY_AREA_TERRITORY),
-                                                       "UK",COUNTRY_CODE)) %>%
-            filter(COUNTRY_AREA_TERRITORY %in% gsub(", England","",unique(flu_ITZ_clusters$country_altern_name)) & 
-                     ISO_YEAR>=2008 & ISO_YEAR<2020) %>%
-              group_by(COUNTRY_AREA_TERRITORY,COUNTRY_CODE,ISO_YEAR,ISO_WEEK,ORIGIN_SOURCE) %>%
-              summarise(INF_A=sum(INF_A),INF_B=sum(INF_B),SPEC_PROCESSED_NB=sum(SPEC_PROCESSED_NB)), 
-          flu_ITZ_clusters %>% filter(method %in% k_method) %>% 
+flunet_data_UK_summed <- left_join(flunet_data %>% 
+  mutate(COUNTRY_AREA_TERRITORY=ifelse(grepl("United Kingdom",COUNTRY_AREA_TERRITORY),
+                                       "United Kingdom",COUNTRY_AREA_TERRITORY),
+         COUNTRY_CODE=ifelse(grepl("United Kingdom",COUNTRY_AREA_TERRITORY),"UK",COUNTRY_CODE)) %>%
+  filter(COUNTRY_AREA_TERRITORY %in% gsub(", England","",unique(flu_ITZ_clusters$country_altern_name)) & 
+           ISO_YEAR>=2008 & ISO_YEAR<2020) %>%
+  group_by(COUNTRY_AREA_TERRITORY,COUNTRY_CODE,ISO_YEAR,ISO_WEEK,ORIGIN_SOURCE) %>%
+  summarise(INF_A=sum(INF_A),INF_B=sum(INF_B),SPEC_PROCESSED_NB=sum(SPEC_PROCESSED_NB)) %>% ungroup(),
+  flu_ITZ_clusters %>% select(country,country_altern_name) %>% 
+    rename(COUNTRY_AREA_TERRITORY=country_altern_name) %>% unique() ) %>% 
+  mutate(country=ifelse(COUNTRY_AREA_TERRITORY %in% "United Kingdom","United Kingdom",country))
+  
+
+for (k_method in c("kmeans_cluster","hi_cluster_ward")) { # [2]
+# how many years of data by ITZ + average # of tests?
+data_by_ITZ <-  left_join(
+      flunet_data_UK_summed, 
+      flu_ITZ_clusters %>% filter(method %in% k_method) %>% 
             mutate(country_altern_name=ifelse(country_altern_name %in% "United Kingdom, England",
                                               "United Kingdom",country_altern_name)) %>%
-            select(country_altern_name,cluster_name) %>% rename(COUNTRY_AREA_TERRITORY=country_altern_name) ) %>%
-  select(COUNTRY_AREA_TERRITORY,COUNTRY_CODE,ISO_YEAR,ISO_WEEK,ORIGIN_SOURCE,
-         INF_A,INF_B,SPEC_PROCESSED_NB,cluster_name) %>% # add UK nations
-  pivot_longer(c(INF_A,INF_B),names_to="STRAIN") %>% # ungroup() %>%
+            select(country_altern_name,cluster_name) %>% 
+            rename(COUNTRY_AREA_TERRITORY=country_altern_name) ) %>%
+  # JOIN
+  pivot_longer(c(INF_A,INF_B),names_to="STRAIN") %>% 
   group_by(COUNTRY_AREA_TERRITORY,COUNTRY_CODE,STRAIN,ORIGIN_SOURCE,cluster_name) %>%
   complete(ISO_YEAR=seq(min(ISO_YEAR),max(ISO_YEAR),by=1),
            ISO_WEEK=seq(min(ISO_WEEK),max(ISO_WEEK),by=1),
            fill=list(value=0,SPEC_PROCESSED_NB=0)) %>%
+  # years with data
+  group_by(COUNTRY_AREA_TERRITORY,STRAIN,ORIGIN_SOURCE) %>% mutate(n_yr=n_distinct(ISO_YEAR)) %>%
+  # yearly averages
   group_by(COUNTRY_AREA_TERRITORY,COUNTRY_CODE,ISO_YEAR,ORIGIN_SOURCE,cluster_name,STRAIN) %>%
   summarise(n_wk_pos_nonzero=sum(value>0,na.rm=T),n_wk_test_nonzero=sum(SPEC_PROCESSED_NB>0,na.rm=T),
-            mean_spec_proc=mean(SPEC_PROCESSED_NB)) %>%
-  pivot_longer(c(n_wk_pos_nonzero,n_wk_test_nonzero,mean_spec_proc),names_to="data_metric",values_to="count") %>%
+            mean_positives=mean(value,na.rm=T),mean_spec_proc=mean(SPEC_PROCESSED_NB,na.rm=T),
+            n_yr=unique(n_yr)) %>%
+  pivot_longer(c(n_wk_pos_nonzero,n_wk_test_nonzero,mean_positives,mean_spec_proc),
+               names_to="data_metric",values_to="count") %>%
   group_by(COUNTRY_AREA_TERRITORY,COUNTRY_CODE,ORIGIN_SOURCE,cluster_name,STRAIN,data_metric) %>%
-  summarise(mean=mean(count),median=median(count),
-            CI50_l=quantile(count,probs=25/100),CI50_u=quantile(count,probs=75/100),
+  summarise(n_yr=unique(n_yr),mean=mean(count),median=median(count),
+            IQR_low=quantile(count,probs=25/100),IQR_high=quantile(count,probs=75/100),
             STRAIN_SOURCE=paste0(STRAIN," (",gsub("DEFINED","DEF",
                                              gsub("SENTINEL","SENT",ORIGIN_SOURCE)),")")) %>%
-  unique() %>% rename(country=COUNTRY_AREA_TERRITORY) %>% 
-  mutate(country_altern_name=country,
-       country_altern_name=case_when(
-         country %in% "Bolivia (Plurinational State of)" ~ "Bolivia",
-         country %in% "Venezuela (Bolivarian Republic of)" ~ "Venezuela",
-         country %in% "United States of America" ~ "USA",
-         country %in% "Russian Federation" ~ "Russia",
-         country %in% "United Kingdom, England" ~ "England",
-         country %in% "Iran (Islamic Republic of)" ~ "Iran",
-         country %in% "Côte d'Ivoire" ~ "Cote d'Iv",
-         country %in% "Democratic Republic of the Congo" ~ "DRC",
-         country %in% "Central African Republic" ~ "CAR",
-         country %in% "Lao People's Democratic Republic" ~ "Laos",
-         grepl("Tanzania",country) ~ "Tanzania",
-         grepl("Korea",country) ~ "S Korea",
-         TRUE ~ country))
-# PLOT
-sel_datametric <- "n_wk_test_nonzero"
-data_by_ITZ %>% filter(data_metric %in% sel_datametric & CI50_l>44) %>%  
-  mutate(country_altern_name=gsub(" ","\n",country_altern_name)) %>%  # filter(cluster_name %in% "Europe") %>% 
-ggplot(aes(x=country_altern_name,color=STRAIN_SOURCE,fill=STRAIN_SOURCE)) + 
-  facet_wrap(~cluster_name,scales = "free") +
-  # geom_point(aes(y=mean),shape=1,position=position_dodge(width=0.5)) +
-  geom_point(aes(y=median),position=position_dodge(width=0.5),size=2) + # shape=0,
-  geom_errorbar(aes(ymin=CI50_l,ymax=CI50_u),width=0.3,position=position_dodge(width=0.5)) +
-  xlab("") + ylab(ifelse(grepl("n_wk_test",sel_datametric),"n_week specimens>1","n_week positives>1")) +
-  scale_color_manual(values=strain_colors) + theme_bw() + standard_theme
+  unique() %>% rename(country=COUNTRY_AREA_TERRITORY) %>% mutate_if(is.numeric, round, digits=2)
+data_by_ITZ <- fcn_shortercntr_names(data_by_ITZ) 
+
+# subset for PLOT
+sel_datametric <- c("n_wk_test_nonzero","mean_spec_proc","mean_positives")[2]
+exempl_cntrs <- data_by_ITZ %>% filter(data_metric %in% sel_datametric & n_yr>=5 & (!STRAIN %in% "INF_B") ) %>%
+  mutate(country_altern_name=gsub(" ","\n",country_altern_name)) %>%  
+  group_by(STRAIN_SOURCE,cluster_name) %>% mutate(rank_median=rank(-median)) %>%
+  group_by(country_altern_name) %>% mutate(rank_overall=mean(rank_median)) %>%
+  group_by(cluster_name) %>% mutate(rank_overall=dense_rank(rank_overall)) %>% 
+  filter(rank_overall<4 & median>20) %>% group_by(cluster_name) %>% mutate(n_c=n_distinct(country_altern_name))
+# n of years w/ data
+n_yr_labels <- exempl_cntrs %>% 
+  group_by(cluster_name) %>% mutate(IQR=max(IQR_high)) %>%
+  group_by(country_altern_name,STRAIN_SOURCE) %>% 
+  summarise(n_yr=unique(n_yr),cluster_name=unique(cluster_name),IQR=unique(IQR)) %>% 
+  group_by(country_altern_name) %>% 
+  summarise(n_yr=paste0("[",paste0(n_yr,collapse = ","),"]"),
+            IQR=unique(IQR),cluster_name=unique(cluster_name))
+# plot
+exempl_cntrs %>%
+ggplot(aes(x=country_altern_name)) + 
+  facet_wrap(~cluster_name,scales="free") +
+  geom_errorbar(aes(ymin=IQR_low,ymax=IQR_high,group=ORIGIN_SOURCE),position=position_dodge(width=3/4),width=1/3) +
+  geom_point(aes(y=median,color=ORIGIN_SOURCE,fill=ORIGIN_SOURCE),position=position_dodge(width=3/4),size=3) +
+  xlab("") + ylab(ifelse(grepl("spec",sel_datametric),"<# specimens processed>",sel_datametric)) + 
+  geom_vline(aes(xintercept=ifelse(n_c>1,(1:(n_c-1))+1/2,NA)),size=1/2) + 
+  geom_text(data=n_yr_labels,aes(y=1.3*IQR,label=n_yr)) + # guides(color=guide_legend(ncol=2))
+  scale_y_log10() + scale_color_manual(values=source_colors) + labs(color="",fill="") + 
+  theme_bw() + standard_theme + 
+  theme(legend.position="top",legend.text=element_text(size=13),strip.text=element_text(size=15),
+        axis.text.x=element_text(size=14,angle=0),axis.text.y=element_text(size=13))
+# save
+ggsave(paste0("output/plots/cluster/summary_stats/",k_method,"_",sel_datametric,".png"),
+       width=36,height=24,units="cm")
+}
+
+### ### ### ### ### ### 
+# plot selected countries vs. their cluster's mean/median
+n_sel <- c(1,2)[2]
+sel_cntrs_per_cluster <- c("Africa"=c("Ghana","South Africa")[n_sel],
+                           "Asia-Europe"=c("Turkey","Iran")[n_sel],
+                           "Eastern and Southern Asia"="China", 
+                           "Europe"=c("United Kingdom","Spain")[n_sel],
+                           "Northern America"=c("Canada","United States")[n_sel],
+                           "Oceania-Melanesia-Polynesia"="Australia","Southern America"="Argentina")
+
+# intersect(flunet_data_UK_summed$country,sel_cntrs_per_cluster)
+
+strain_metasource_colors <- c("INF_A (NONSENT)"="darkred","INF_A (SENTINEL)"="orange",
+                              "INF_B (NONSENT)"="#00BA38","INF_B (SENTINEL)"="turquoise")
+
+for (CI_50_FLAG in c(T,F)) {
+for (k_method in c("kmeans_cluster","hi_cluster_ward")) {
+  
+  cluster_mean_median <- left_join(
+    flunet_data_UK_summed,
+    flu_ITZ_clusters %>% filter(method %in% k_method) %>% 
+                          mutate(country_altern_name=ifelse(country_altern_name %in% "United Kingdom, England",
+                                           "United Kingdom",country_altern_name)) %>%
+                          select(country_altern_name,cluster_name) %>% 
+                          rename(COUNTRY_AREA_TERRITORY=country_altern_name) ) %>%
+    mutate(metasource=ifelse(grepl("NOT|NON",ORIGIN_SOURCE),"NONSENT",ORIGIN_SOURCE)) %>%
+    pivot_longer(c(INF_A,INF_B),names_to="STRAIN") %>%
+    mutate(positivity=100*value/SPEC_PROCESSED_NB, STRAIN_SOURCE=paste0(STRAIN," (",metasource,")")) %>%
+    group_by(COUNTRY_AREA_TERRITORY,STRAIN) %>% 
+    complete(ISO_YEAR=seq(min(ISO_YEAR),max(ISO_YEAR),by=1),
+             ISO_WEEK=seq(min(ISO_WEEK),max(ISO_WEEK),by=1),
+             fill=list(value=NA)) %>% filter(!is.na(cluster_name)) %>%
+    # calculate averages ...
+    filter(ISO_WEEK<53 & (positivity<=100 |is.na(positivity) )) %>% 
+    group_by(ISO_WEEK,STRAIN_SOURCE,cluster_name,STRAIN) %>% 
+    summarise(n_cntr=n_distinct(COUNTRY_AREA_TERRITORY),n_year=n_distinct(ISO_YEAR),
+              mean_all=mean(!!sym(varname),na.rm=T),median_all=median(!!sym(varname),na.rm=T),
+              min_clust=min(!!sym(varname),na.rm=T),max_clust=max(!!sym(varname),na.rm=T),
+              CI50_l=quantile(positivity,probs=25/100,na.rm=T),
+              CI50_u=quantile(positivity,probs=75/100,na.rm=T),
+              CI95_l=quantile(positivity,probs=2.5/100,na.rm=T),
+              CI95_u=quantile(positivity,probs=97.5/100,na.rm=T)) %>%
+    mutate_if(is.numeric, round, digits=2) %>%
+    filter(!is.na(cluster_name)) %>% group_by(STRAIN_SOURCE,cluster_name) %>% 
+    mutate(n_cntr_all_weeks=round(mean(n_cntr,na.rm=T)),
+           max_cluster_all_weeks=max(CI95_u,na.rm=T)) %>%
+    group_by(STRAIN_SOURCE) %>% mutate(max_cluster_all_weeks=max(CI50_u,na.rm=T))
+  
+  # selected countries
+  df_posit_sel_cntrs <- left_join(
+    flunet_data_UK_summed,
+    flu_ITZ_clusters %>% filter(method %in% k_method) %>% 
+      mutate(country_altern_name=ifelse(country_altern_name %in% "United Kingdom, England",
+                                        "United Kingdom",country_altern_name)) %>%
+      select(country_altern_name,cluster_name) %>% 
+      rename(COUNTRY_AREA_TERRITORY=country_altern_name) ) %>%
+    filter(country %in% sel_cntrs_per_cluster) %>%
+    mutate(metasource=ifelse(grepl("NOT|NON",ORIGIN_SOURCE),"NONSENT",ORIGIN_SOURCE)) %>%
+    pivot_longer(c(INF_A,INF_B),names_to="STRAIN") %>%
+    mutate(positivity=100*value/SPEC_PROCESSED_NB,
+           STRAIN_SOURCE=paste0(STRAIN," (",metasource,")")) %>%
+    group_by(COUNTRY_AREA_TERRITORY,STRAIN) %>% 
+    complete(ISO_YEAR=seq(min(ISO_YEAR),max(ISO_YEAR),by=1),
+             ISO_WEEK=seq(min(ISO_WEEK),max(ISO_WEEK),by=1),
+             fill=list(value=NA)) %>% filter(ISO_WEEK<53 & !is.na(cluster_name) & positivity<=100) 
+  # 
+  df_sel_cntr_median <- df_posit_sel_cntrs %>%
+    group_by(COUNTRY_AREA_TERRITORY,country,STRAIN_SOURCE,ISO_WEEK,cluster_name) %>%
+    summarise(median=median(positivity,na.rm=T),mean=mean(positivity,na.rm=T),
+              CI50_l=quantile(positivity,probs=25/100,na.rm=T),
+              CI50_u=quantile(positivity,probs=75/100,na.rm=T))
+  # max per cntr
+  df_cntrs_clusters <- df_posit_sel_cntrs %>% filter(STRAIN_SOURCE %in% "INF_A (NONSENT)") %>%
+    group_by(STRAIN_SOURCE) %>% mutate(pos=max(positivity)) %>% 
+    select(country,cluster_name,STRAIN_SOURCE,pos) %>% unique()
+  # PLOT
+  p <- df_posit_sel_cntrs %>% ggplot() +
+      # country median
+      geom_line(data=df_sel_cntr_median,aes(x=ISO_WEEK,y=median,color=factor(STRAIN_SOURCE)),linewidth=1.1) +
+      # cluster median
+      geom_line(data=cluster_mean_median, aes(x=ISO_WEEK,y=median_all,group=STRAIN_SOURCE),color="black") +
+      facet_grid(STRAIN_SOURCE~cluster_name,scales="free_y") + 
+      geom_text(data=df_cntrs_clusters,
+                aes(x=5+nchar(country),y=ifelse(CI_50_FLAG,50,pos*0.9),label=country),show.legend=FALSE) +
+      scale_color_manual(values=strain_metasource_colors) + scale_fill_manual(values=strain_metasource_colors) + 
+      scale_x_continuous(expand=expansion(0.01,0)) + scale_y_continuous(expand=expansion(0.02,0)) + 
+      ggtitle(k_method) + guides(color=guide_legend(ncol=2)) + labs(color="") + ylab(paste0("positivity (%, median)")) +
+      theme_bw() + standard_theme + 
+      theme(legend.position="top",legend.text=element_text(size=12),title=element_text(size=17))
+    
+    if (CI_50_FLAG) {
+      p <- p + # cluster CI50
+        # country CI50
+        geom_ribbon(data=df_sel_cntr_median, aes(x=ISO_WEEK,ymin=CI50_l,ymax=CI50_u,
+                        group=STRAIN_SOURCE,fill=factor(STRAIN_SOURCE)),alpha=1/3,show.legend=F) +
+        geom_line(data=cluster_mean_median, aes(x=ISO_WEEK,y=CI50_l,group=STRAIN_SOURCE),color="darkgrey") +
+        geom_line(data=cluster_mean_median, aes(x=ISO_WEEK,y=CI50_u,group=STRAIN_SOURCE),color="darkgrey")
+    } else {
+      p <- p + # country indiv years
+        geom_line(aes(x=ISO_WEEK,y=positivity,group=ISO_YEAR,color=factor(STRAIN_SOURCE)),alpha=1/2) }
+  p
+    # save
+    ggsave(paste0("output/plots/cluster/summary_stats/sel_cntrs/altern_select/",k_method,"_",
+                  ifelse(CI_50_FLAG,"yrs_CI50","yrs_sep"),".png"), width=36,height=24,units="cm")
+    # for (mean_median_varname in c("mean_all","median_all")) { # } # mean/median
+}
+}
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
 # dustbin of history

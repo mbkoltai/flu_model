@@ -13,6 +13,7 @@ standard_theme=theme(# panel.grid=element_line(linetype="dashed",colour="black",
   axis.text.x=element_text(size=9,angle=90,vjust=1/2),axis.text.y=element_text(size=9),
   axis.title=element_text(size=14), text=element_text(family="Calibri"))
 
+data(pop)
 
 ### assign multiple variables ----------------------------------------------------------
 # use as: g(a,b,c) %=% c(1,2,3)
@@ -60,3 +61,25 @@ fcn_objs_mem_use <- function(min_size){
   mem_use_df<-mem_use_df[order(mem_use_df$size,decreasing=T),]; rownames(mem_use_df)<-c()
   mem_use_df[mem_use_df$size>min_size,c(2,1)]
 }
+
+### get objects larger than x Mb (memory) --------------
+
+fcn_shortercntr_names <- function(df) { 
+  df_out <- df %>% 
+  mutate(country_altern_name=country,
+         country_altern_name=case_when(
+           country %in% "Bolivia (Plurinational State of)" ~ "Bolivia",
+           country %in% "Venezuela (Bolivarian Republic of)" ~ "Venezuela",
+           country %in% "United States of America" ~ "USA",
+           country %in% "Russian Federation" ~ "Russia",
+           country %in% "United Kingdom, England" ~ "England",
+           country %in% "Iran (Islamic Republic of)" ~ "Iran",
+           # country %in% "Côte d'Ivoire" ~ "Cote d'Iv",
+           country %in% "Democratic Republic of the Congo" ~ "DRC",
+           country %in% "Central African Republic" ~ "CAR",
+           country %in% "Lao People's Democratic Republic" ~ "Laos",
+           grepl("Tanzania",country) ~ "Tanzania",
+           grepl("Korea",country) ~ "S Korea",
+           TRUE ~ country))
+  return(df_out)
+  }
