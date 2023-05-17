@@ -1,0 +1,9 @@
+age,variable,mean,CI95_l,CI95_h,country
+all,infect_to_LRTI,0.21,0.14,0.303,Kenya
+<1y,LRTI_to_hosp,0.26,0.159,0.396,Kenya
+1-5y,LRTI_to_hosp,0.24,0.14,0.37,Kenya
+>6y,LRTI_to_hosp,0.16,0.08,0.29,Kenya
+all,ppl_within_10km_hosp_at_surv_site,0.125,0.05,0.2,Kenya
+0-5y,prob_detect_surv_officer,0.7,0.6,0.8,Kenya
+>6y,prob_detect_surv_officer,0.5,0.3,0.7,Kenya
+all,prob_pos_case_pos_test,0.55,0.3,0.8,Kenya

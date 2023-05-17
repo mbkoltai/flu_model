@@ -516,7 +516,7 @@ ggsave(paste0("output/plots/cluster/summary_stats/",k_method,"_",sel_datametric,
 
 ### ### ### ### ### ### 
 # plot selected countries vs. their cluster's mean/median
-n_sel <- c(1,2)[2]
+n_sel <- c(1,2)[1]
 sel_cntrs_per_cluster <- c("Africa"=c("Ghana","South Africa")[n_sel],
                            "Asia-Europe"=c("Turkey","Iran")[n_sel],
                            "Eastern and Southern Asia"="China", 
@@ -605,22 +605,67 @@ for (k_method in c("kmeans_cluster","hi_cluster_ward")) {
       theme(legend.position="top",legend.text=element_text(size=12),title=element_text(size=17))
     
     if (CI_50_FLAG) {
-      p <- p + # cluster CI50
+      p <- p + 
         # country CI50
         geom_ribbon(data=df_sel_cntr_median, aes(x=ISO_WEEK,ymin=CI50_l,ymax=CI50_u,
                         group=STRAIN_SOURCE,fill=factor(STRAIN_SOURCE)),alpha=1/3,show.legend=F) +
+        # cluster CI50
         geom_line(data=cluster_mean_median, aes(x=ISO_WEEK,y=CI50_l,group=STRAIN_SOURCE),color="darkgrey") +
         geom_line(data=cluster_mean_median, aes(x=ISO_WEEK,y=CI50_u,group=STRAIN_SOURCE),color="darkgrey")
     } else {
-      p <- p + # country indiv years
-        geom_line(aes(x=ISO_WEEK,y=positivity,group=ISO_YEAR,color=factor(STRAIN_SOURCE)),alpha=1/2) }
+      p <- p + 
+        # country indiv years
+        geom_line(aes(x=ISO_WEEK,y=positivity,group=interaction(ISO_YEAR,ORIGIN_SOURCE),
+                      color=factor(STRAIN_SOURCE)),alpha=1/2) }
   p
-    # save
-    ggsave(paste0("output/plots/cluster/summary_stats/sel_cntrs/altern_select/",k_method,"_",
-                  ifelse(CI_50_FLAG,"yrs_CI50","yrs_sep"),".png"), width=36,height=24,units="cm")
-    # for (mean_median_varname in c("mean_all","median_all")) { # } # mean/median
+  # save
+  ggsave(paste0("output/plots/cluster/summary_stats/sel_cntrs/",ifelse(n_sel>1,"altern_select/",""),k_method,
+                  ifelse(CI_50_FLAG,"_CI50","_yrs_sep"),".png"), width=36,height=24,units="cm")
+    # for (mean_median_varname in c("mean_all","median_all")) {  } # mean/median
 }
 }
+
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
+# fluID
+
+fluID <- read_csv("data/VIW_FID_EPI.csv")
+
+flu_ID_summ_stats <- fluID[,1:27] %>% 
+  pivot_longer(!c(WHOREGION,FLUSEASON,HEMISPHERE,ITZ,COUNTRY_CODE,COUNTRY_AREA_TERRITORY,
+  ISO_WEEKSTARTDATE,ISO_YEAR,ISO_WEEK,MMWR_WEEKSTARTDATE,MMWR_YEAR,MMWR_WEEK,ORIGIN_SOURCE,AGEGROUP_CODE)) %>%
+  group_by(WHOREGION,COUNTRY_AREA_TERRITORY,name) %>% 
+  summarise(value=sum(!is.na(value)),n_year=length(unique(ISO_YEAR))) %>% filter(value>0)
+
+View(flu_ID_summ_stats %>% filter(grepl(paste(array(sel_cntrs_per_cluster), collapse = "|"), COUNTRY_AREA_TERRITORY)))
+
+# view data
+fluID %>% filter(grepl(paste(c(array(sel_cntrs_per_cluster),"Türkiye"),collapse="|"), COUNTRY_AREA_TERRITORY)) %>%
+  select(COUNTRY_AREA_TERRITORY,ISO_YEAR,ISO_WEEK,ILI_CASES)
+
+# plot ILI
+fluID %>% filter(grepl(paste(c(array(sel_cntrs_per_cluster),"Türkiye"),collapse="|"), COUNTRY_AREA_TERRITORY) & 
+                   !is.na(ILI_CASES) & !AGEGROUP_CODE %in% "UNKNOWN") %>%
+  group_by(COUNTRY_AREA_TERRITORY,AGEGROUP_CODE) %>% mutate(n_year=n_distinct(ISO_YEAR)) %>% filter(n_year>4) %>%
+  ggplot() + facet_wrap(COUNTRY_AREA_TERRITORY~AGEGROUP_CODE,scales="free_y") + 
+  geom_line(aes(x=ISO_WEEK,y=ILI_CASES,colour=ISO_YEAR,group=ISO_YEAR)) + 
+  theme_bw() + standard_theme
+
+# plot ILI outpatient
+# fluID %>% filter(grepl(paste(c(array(sel_cntrs_per_cluster),"Türkiye"),collapse="|"), COUNTRY_AREA_TERRITORY) & 
+#                    !is.na(ILI_OUTPATIENTS) & ILI_OUTPATIENTS>0 & !AGEGROUP_CODE %in% "UNKNOWN") %>%
+#   group_by(COUNTRY_AREA_TERRITORY,AGEGROUP_CODE) %>% mutate(n_year=n_distinct(ISO_YEAR)) %>% filter(n_year>4) %>%
+#   ggplot() + facet_wrap(COUNTRY_AREA_TERRITORY~AGEGROUP_CODE,scales="free_y") + 
+#   geom_line(aes(x=ISO_WEEK,y=ILI_OUTPATIENTS,colour=ISO_YEAR,group=ISO_YEAR)) + theme_bw() + standard_theme
+
+# plot SARI
+fluID %>% filter(grepl(paste(array(sel_cntrs_per_cluster),"Türkiye",collapse="|"), COUNTRY_AREA_TERRITORY) & 
+                   !is.na(SARI_CASES) & !AGEGROUP_CODE %in% "UNKNOWN") %>%
+  group_by(COUNTRY_AREA_TERRITORY,AGEGROUP_CODE) %>% mutate(n_year=n_distinct(ISO_YEAR)) %>% filter(n_year>4) %>%
+  ggplot(aes(x=ISO_WEEK,y=SARI_CASES,colour=ISO_YEAR,group=ISO_YEAR)) + 
+  facet_wrap(COUNTRY_AREA_TERRITORY~AGEGROUP_CODE,scales="free_y") + 
+  geom_line() + theme_bw() + standard_theme
+
+
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
 # dustbin of history
