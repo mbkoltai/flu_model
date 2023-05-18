@@ -234,26 +234,8 @@ flu_ITZ_clusters <- read_csv("data/flu_ITZ_clusters.csv") %>%
          method=gsub("_name","",method)) %>% 
   select(!c(kmeans_cluster_num,hi_cluster_ward_num))
 
-# naming inconsistencies
-incons_names <- unique(flu_ITZ_clusters$country)[!unique(flu_ITZ_clusters$country) %in% 
-                                                   unique(flunet_data$COUNTRY_AREA_TERRITORY)]
-part_match <- unlist(lapply(incons_names, 
-                            function(x) which(grepl(x,unique(flunet_data$COUNTRY_AREA_TERRITORY)))))
-# unique(flunet_data$COUNTRY_AREA_TERRITORY)[part_match]
-
-flu_ITZ_clusters <- flu_ITZ_clusters %>% 
-                      mutate(country_altern_name=country,
-                             country_altern_name=case_when(
-                                      country %in% "Bolivia" ~ "Bolivia (Plurinational State of)",
-                                       country %in% "Venezuela" ~ "Venezuela (Bolivarian Republic of)",
-                                       country %in% "United States" ~ "United States of America",
-                                       country %in% "Russia" ~ "Russian Federation",
-                                       country %in% "United Kingdom" ~ "United Kingdom, England",
-                                       country %in% "Iran" ~ "Iran (Islamic Republic of)",
-                                       country %in% "Cote d'Ivoire" ~ "Côte d'Ivoire",
-                                       country %in% "Turkey" ~ "Türkiye",
-                                       country %in% "Laos" ~ "Lao People's Democratic Republic",
-                                      .default=country)) # TRUE ~ country
+# correct naming inconsistencies...
+source("fcns/flu_ITZ_naming.R")
 
 # PLOT by STRAIN + by clusters
 strain_colors <- c("INF_A (NOTDEFINED)"="#F8766D","INF_A (NONSENTINEL)"="darkred",
@@ -395,22 +377,29 @@ for (k_method in c("kmeans_cluster","hi_cluster_ward")) {
   summarise(n_cntr=n_distinct(COUNTRY_AREA_TERRITORY),n_year=n_distinct(ISO_YEAR),
             mean_all=mean(!!sym(varname),na.rm=T),median_all=median(!!sym(varname),na.rm=T),
             min_clust=min(!!sym(varname),na.rm=T),max_clust=max(!!sym(varname),na.rm=T),
-            CI50_l=quantile(positivity,probs=25/100,na.rm=T),CI50_u=quantile(positivity,probs=75/100,na.rm=T),
-            CI95_l=quantile(positivity,probs=2.5/100,na.rm=T),CI95_u=quantile(positivity,probs=97.5/100,na.rm=T)) %>%
+            CI50_l=quantile(positivity,probs=25/100,na.rm=T),
+            CI50_u=quantile(positivity,probs=75/100,na.rm=T),
+            CI95_l=quantile(positivity,probs=2.5/100,na.rm=T),
+            CI95_u=quantile(positivity,probs=97.5/100,na.rm=T)) %>%
   filter(!is.na(cluster_name)) %>% group_by(STRAIN_SOURCE,cluster_name) %>% 
-  mutate(n_cntr_all_weeks=round(mean(n_cntr,na.rm=T)),max_cluster_all_weeks=max(CI95_u,na.rm=T)) %>%
+  mutate(n_cntr_all_weeks=round(mean(n_cntr,na.rm=T)),
+         max_cluster_all_weeks=max(CI95_u,na.rm=T)) %>%
   group_by(STRAIN_SOURCE) %>% mutate(max_cluster_all_weeks=max(CI50_u,na.rm=T))
 
 # PLOT
 for (mean_median_varname in c("mean_all","median_all")) {
 p <- mean_var_df %>% ggplot() +
-  geom_line(aes(x=ISO_WEEK,y=get(mean_median_varname)*100,group=STRAIN_SOURCE,color=factor(STRAIN_SOURCE)),linewidth=1.1) +
-  geom_line(aes(x=ISO_WEEK,y=get(mean_median_varname)*100,group=STRAIN_SOURCE),linewidth=1/3,color="black") +
+  geom_line(aes(x=ISO_WEEK,y=get(mean_median_varname)*100,
+                group=STRAIN_SOURCE,color=factor(STRAIN_SOURCE)),linewidth=1.1) +
+  geom_line(aes(x=ISO_WEEK,y=get(mean_median_varname)*100,
+                group=STRAIN_SOURCE),linewidth=1/3,color="black") +
   geom_ribbon(aes(x=ISO_WEEK,ymin=CI50_l*100,ymax=CI50_u*100,
                   group=STRAIN_SOURCE,fill=factor(STRAIN_SOURCE)),alpha=1/3,show.legend=F) +
   facet_grid(STRAIN_SOURCE~cluster_name,scales="free_y") + labs(color="") +
-  geom_text(data=mean_var_df %>% select(cluster_name,STRAIN_SOURCE,n_cntr_all_weeks,max_cluster_all_weeks) %>% unique(),
-            aes(x=36,y=max_cluster_all_weeks*0.8*100,label=paste0("<n_cntr>=",n_cntr_all_weeks)),show.legend=FALSE) +
+  geom_text(data=mean_var_df %>% select(cluster_name,STRAIN_SOURCE,
+                                        n_cntr_all_weeks,max_cluster_all_weeks) %>% unique(),
+            aes(x=36,y=max_cluster_all_weeks*0.8*100,
+                label=paste0("<n_cntr>=",n_cntr_all_weeks)),show.legend=FALSE) +
   scale_color_manual(values=strain_colors) + scale_fill_manual(values=strain_colors) + 
   scale_x_continuous(expand=expansion(0.01,0)) + scale_y_continuous(expand=expansion(0.02,0)) + 
   ggtitle(k_method) + guides(color=guide_legend(ncol=2)) +
@@ -435,14 +424,16 @@ ggsave(paste0("output/plots/cluster/",k_method,"/",gsub("value","incidence",varn
 source_colors <- c("NOTDEFINED"="#F8766D","NONSENTINEL"="#00BA38","SENTINEL"="#619CFF")
 ### ### ###
 
-flunet_data_UK_summed <- left_join(flunet_data %>% 
+flunet_data_UK_summed <- left_join(
+  flunet_data %>% 
   mutate(COUNTRY_AREA_TERRITORY=ifelse(grepl("United Kingdom",COUNTRY_AREA_TERRITORY),
                                        "United Kingdom",COUNTRY_AREA_TERRITORY),
          COUNTRY_CODE=ifelse(grepl("United Kingdom",COUNTRY_AREA_TERRITORY),"UK",COUNTRY_CODE)) %>%
   filter(COUNTRY_AREA_TERRITORY %in% gsub(", England","",unique(flu_ITZ_clusters$country_altern_name)) & 
-           ISO_YEAR>=2008 & ISO_YEAR<2020) %>%
+           ISO_YEAR>=2008 & ISO_WEEKSTARTDATE<as.Date("2020-03-01")) %>%
   group_by(COUNTRY_AREA_TERRITORY,COUNTRY_CODE,ISO_YEAR,ISO_WEEK,ORIGIN_SOURCE) %>%
-  summarise(INF_A=sum(INF_A),INF_B=sum(INF_B),SPEC_PROCESSED_NB=sum(SPEC_PROCESSED_NB)) %>% ungroup(),
+  summarise(INF_A=sum(INF_A),INF_B=sum(INF_B),SPEC_PROCESSED_NB=sum(SPEC_PROCESSED_NB),
+            ISO_WEEKSTARTDATE=unique(ISO_WEEKSTARTDATE)) %>% ungroup(),
   flu_ITZ_clusters %>% select(country,country_altern_name) %>% 
     rename(COUNTRY_AREA_TERRITORY=country_altern_name) %>% unique() ) %>% 
   mutate(country=ifelse(COUNTRY_AREA_TERRITORY %in% "United Kingdom","United Kingdom",country))
@@ -529,9 +520,31 @@ sel_cntrs_per_cluster <- c("Africa"=c("Ghana","South Africa")[n_sel],
 strain_metasource_colors <- c("INF_A (NONSENT)"="darkred","INF_A (SENTINEL)"="orange",
                               "INF_B (NONSENT)"="#00BA38","INF_B (SENTINEL)"="turquoise")
 
+varname=c("positivity","value")[1]
+
 for (CI_50_FLAG in c(T,F)) {
 for (k_method in c("kmeans_cluster","hi_cluster_ward")) {
   
+  # all data for selected countries
+  df_posit_sel_cntrs <- left_join(
+    flunet_data_UK_summed,
+    flu_ITZ_clusters %>% filter(method %in% k_method) %>% 
+      mutate(country_altern_name=ifelse(country_altern_name %in% "United Kingdom, England",
+                                        "United Kingdom",country_altern_name)) %>%
+      select(country_altern_name,cluster_name) %>% 
+      rename(COUNTRY_AREA_TERRITORY=country_altern_name) ) %>%
+    filter(country %in% sel_cntrs_per_cluster) %>%
+    mutate(metasource=ifelse(grepl("NOT|NON",ORIGIN_SOURCE),"NONSENT",ORIGIN_SOURCE)) %>%
+    pivot_longer(c(INF_A,INF_B),names_to="STRAIN") %>%
+    mutate(positivity=100*value/SPEC_PROCESSED_NB,
+           STRAIN_SOURCE=paste0(STRAIN," (",metasource,")")) %>%
+    group_by(COUNTRY_AREA_TERRITORY,STRAIN) %>% 
+    complete(ISO_YEAR=seq(min(ISO_YEAR),max(ISO_YEAR),by=1),
+             ISO_WEEK=seq(min(ISO_WEEK),max(ISO_WEEK),by=1),
+             fill=list(value=NA)) %>% 
+    filter(ISO_WEEK<53 & !is.na(cluster_name) & positivity<=100)
+  
+  # mean/median for clusters
   cluster_mean_median <- left_join(
     flunet_data_UK_summed,
     flu_ITZ_clusters %>% filter(method %in% k_method) %>% 
@@ -562,24 +575,7 @@ for (k_method in c("kmeans_cluster","hi_cluster_ward")) {
            max_cluster_all_weeks=max(CI95_u,na.rm=T)) %>%
     group_by(STRAIN_SOURCE) %>% mutate(max_cluster_all_weeks=max(CI50_u,na.rm=T))
   
-  # selected countries
-  df_posit_sel_cntrs <- left_join(
-    flunet_data_UK_summed,
-    flu_ITZ_clusters %>% filter(method %in% k_method) %>% 
-      mutate(country_altern_name=ifelse(country_altern_name %in% "United Kingdom, England",
-                                        "United Kingdom",country_altern_name)) %>%
-      select(country_altern_name,cluster_name) %>% 
-      rename(COUNTRY_AREA_TERRITORY=country_altern_name) ) %>%
-    filter(country %in% sel_cntrs_per_cluster) %>%
-    mutate(metasource=ifelse(grepl("NOT|NON",ORIGIN_SOURCE),"NONSENT",ORIGIN_SOURCE)) %>%
-    pivot_longer(c(INF_A,INF_B),names_to="STRAIN") %>%
-    mutate(positivity=100*value/SPEC_PROCESSED_NB,
-           STRAIN_SOURCE=paste0(STRAIN," (",metasource,")")) %>%
-    group_by(COUNTRY_AREA_TERRITORY,STRAIN) %>% 
-    complete(ISO_YEAR=seq(min(ISO_YEAR),max(ISO_YEAR),by=1),
-             ISO_WEEK=seq(min(ISO_WEEK),max(ISO_WEEK),by=1),
-             fill=list(value=NA)) %>% filter(ISO_WEEK<53 & !is.na(cluster_name) & positivity<=100) 
-  # 
+  # medians of selected countries
   df_sel_cntr_median <- df_posit_sel_cntrs %>%
     group_by(COUNTRY_AREA_TERRITORY,country,STRAIN_SOURCE,ISO_WEEK,cluster_name) %>%
     summarise(median=median(positivity,na.rm=T),mean=mean(positivity,na.rm=T),
@@ -624,6 +620,9 @@ for (k_method in c("kmeans_cluster","hi_cluster_ward")) {
     # for (mean_median_varname in c("mean_all","median_all")) {  } # mean/median
 }
 }
+
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
+
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
 # fluID

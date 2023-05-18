@@ -82,4 +82,63 @@ fcn_shortercntr_names <- function(df) {
            grepl("Korea",country) ~ "S Korea",
            TRUE ~ country))
   return(df_out)
+}
+
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
+
+# function to identify flu seasons
+
+fcn_identify_seasons <- function(df_input,sel_variable,source_varname="ORIGIN_SOURCE",
+                                 up_thresh=0.9,low_thresh=0.6,length_lim=9,print_flag=F){
+  
+  df_inds <- df_input %>% ungroup() %>%  select(country,STRAIN,!!source_varname) %>% unique()
+  list_cntr_epid_incl<-list()
+  
+  # sel_variable 
+  if (sel_variable %in% "positivity") {
+    df_input <- df_input %>% rename(count=value) %>% mutate(value=count/SPEC_PROCESSED_NB)
   }
+  
+  for (k_row in 1:nrow(df_inds)) {
+    sel_source_varname <- as.character(df_inds[k_row,source_varname])
+    
+    input_data <- df_input %>% 
+      filter(country %in% df_inds$country[k_row] & 
+                                        STRAIN %in% df_inds$STRAIN[k_row] & 
+                                        !!sym(source_varname) %in% sel_source_varname) %>%
+      mutate(flu_peak=quantile(value,probs=up_thresh),over_peak=F,
+             over_peak=flu_peak<value,
+             flu_included=quantile(value, probs=low_thresh),
+             over_inclusion=F, over_inclusion=flu_included<value,
+             seq_log=rep(rle(over_inclusion)$length>=length_lim,
+                         times=rle(over_inclusion)$length))
+    if (print_flag){
+          print(paste0(paste0(dim(input_data),collapse = ", "),", ",paste0(df_inds[k_row,],collapse =", ")))
+      }
+    
+    tmp <- rle(input_data$over_inclusion)
+    
+    # add the sequence number to each
+    seq_to_add <- c(); start_seq <- 1
+    for(i in 1:length(tmp$lengths)){
+      length_run <- tmp$lengths[i]
+      tester <- input_data[sum(tmp$lengths[1:i]),"over_inclusion"]
+      if(tester == F){ 
+        seq_to_add <- c(seq_to_add, rep(0,length_run))
+      } else {
+        seq_to_add <- c(seq_to_add, rep(start_seq,length_run))
+        start_seq <- start_seq + 1
+      }
+    }
+    
+    input_data$seq <- seq_to_add; input_data$epidem_inclusion <- 0
+    for(j in 1:start_seq){
+      if (sum(input_data$over_peak[input_data$seq==j])>0) {
+        input_data$epidem_inclusion[input_data$seq==j]=1  }
+    }
+    
+    list_cntr_epid_incl[[k_row]] <- input_data %>% rename(positivity=value,value=count)
+  }
+  
+  return(bind_rows(list_cntr_epid_incl))
+}
