@@ -108,9 +108,8 @@ fcn_identify_seasons <- function(df_input,sel_variable,source_varname="ORIGIN_SO
                                         !!sym(source_varname) %in% sel_source_varname) %>%
       mutate(flu_peak=quantile(value,probs=up_thresh), over_peak=F, over_peak=flu_peak<value,
              flu_included=quantile(value, probs=low_thresh), 
-                    over_inclusion=F, over_inclusion=flu_included<value,
-             seq_log=rep(rle(over_inclusion)$length>=length_lim,
-             times=rle(over_inclusion)$length))
+                    over_inclusion=F, over_inclusion=flu_included<value) 
+    # seq_log=rep(rle(over_inclusion)$length>=length_lim,times=rle(over_inclusion)$length)
     if (print_flag){
           print(paste0( paste0(dim(input_data),collapse = ", "),", ",
                         paste0(df_inds[k_row,],collapse =", ")) )
@@ -141,6 +140,10 @@ fcn_identify_seasons <- function(df_input,sel_variable,source_varname="ORIGIN_SO
         input_data$epidem_inclusion[input_data$seq==j]=1  }
     }
     
+    input_data <- input_data %>%
+      mutate(epid_index = cumsum(epidem_inclusion == 1 & lag(epidem_inclusion, default = 0) == 0) ,
+             epid_index=ifelse(epidem_inclusion == 0,0,epid_index))
+    
     list_cntr_epid_incl[[k_row]] <- input_data %>% rename(positivity=value,value=count)
   }
   
@@ -152,10 +155,69 @@ fcn_identify_seasons <- function(df_input,sel_variable,source_varname="ORIGIN_SO
 fcn_find_bloc_lims <- function(df_cont_data,log_flag=T) {
   df_cont_data %>% group_by(country) %>% 
   mutate(min_val=ifelse(log_flag,1,min(value)),max_val=max(value)) %>%
-  group_by(country,metasource,STRAIN) %>% mutate(block=cumsum(epidem_inclusion == 0)) %>%
+  group_by(country,metasource,STRAIN) %>% mutate(n_data_points=cumsum(epidem_inclusion==0)) %>%
   filter(epidem_inclusion==1) %>%
-  group_by(country,metasource,STRAIN,block) %>%
+  group_by(country,metasource,STRAIN,n_data_points) %>%
   summarize(start_date=min(ISO_WEEKSTARTDATE),end_date=max(ISO_WEEKSTARTDATE),
             min_val=unique(min_val),max_val=max(max_val)) %>%
-    mutate(country=ifelse(grepl("King",country),"UK",country))
+    mutate(country=ifelse(grepl("King",country),"UK",country)) %>% 
+    arrange(country, metasource, STRAIN) %>% mutate(index=row_number())
 }
+
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
+# create reduced contact matrix --------------
+fun_create_red_C_m=function(C_m_full,model_agegroups,orig_age_groups_duration,orig_age_groups_sizes){
+  C_m=matrix(0,nrow=nrow(model_agegroups),ncol=nrow(model_agegroups)); rownames(C_m)=model_agegroups$agegroup_name
+  colnames(C_m)=model_agegroups$agegroup_name
+  for (i_row in 1:n_age){
+    for (j_col in 1:n_age){
+      # we are merging or splitting age groups, there are 3 possibilities for a new age group:
+      # same OR smaller than (ST) OR larger than (LT) the original
+      # (it is an *average* of contacts per person, and we have no resolution within age bands)
+      #
+      # if the 'i' group (C[i,j]) is the *same* as original or *smaller*, this (in itself) does not change the contact rate
+      if (model_agegroups$wpp_agegroup_low[i_row]==model_agegroups$wpp_agegroup_high[i_row]) {
+        # 'j' group same or smaller as original
+        if (model_agegroups$wpp_agegroup_low[j_col]==model_agegroups$wpp_agegroup_high[j_col]) {
+          f_dur=model_agegroups$duration[j_col]/orig_age_groups_duration[model_agegroups$wpp_agegroup_high[j_col]]
+          C_m[i_row,j_col]=(C_m_full[model_agegroups$wpp_agegroup_low[i_row],model_agegroups$wpp_agegroup_low[j_col]])*f_dur
+        } else { # if 'j' is larger than original group
+          group_span=model_agegroups$wpp_agegroup_low[j_col]:model_agegroups$wpp_agegroup_high[j_col]
+          agegroup_weights=orig_age_groups_sizes[group_span]/sum(orig_age_groups_sizes[group_span])
+          C_m[i_row,j_col]=sum(agegroup_weights*C_m_full[i_row,group_span])
+        } # end of 'i' smaller or same as original
+      } else { # if 'i' in C[i,j] is a bigger age band -> weighted average of the contact rates of constituent groups
+        group_span=model_agegroups$wpp_agegroup_low[i_row]:model_agegroups$wpp_agegroup_high[i_row]
+        agegroup_weights=orig_age_groups_sizes[group_span]/sum(orig_age_groups_sizes[group_span])
+        # if 'j' is same/smaller -> contact rate with original group proportionally divided
+        if (model_agegroups$wpp_agegroup_low[j_col]==model_agegroups$wpp_agegroup_high[j_col]) {
+          f_dur=model_agegroups$duration[j_col]/orig_age_groups_duration[model_agegroups$wpp_agegroup_high[j_col]]
+          C_m[i_row,j_col]=
+            sum((orig_age_groups_sizes[group_span]/sum(orig_age_groups_sizes[group_span]))*C_m_full[group_span,j_col])*f_dur
+        } else {# if 'j' larger -> weighted average of the contact rates of the constituent groups
+          # print(c(i_row,j_col)); print(agegroup_weights); print(group_span)
+          C_m[i_row,j_col]=sum(rep(agegroup_weights,length(agegroup_weights))*unlist(
+            lapply(group_span,function(x) {agegroup_weights*C_m_full[x,group_span]})))
+        }
+      }
+      # C_m[i_row,j_col]=mean(C_m_full[model_agegroups$wpp_agegroup_low[i_row]:model_agegroups$wpp_agegroup_high[i_row],
+      #                                model_agegroups$wpp_agegroup_low[j_col]:model_agegroups$wpp_agegroup_high[j_col]])   
+      } 
+    }
+  C_m 
+}
+
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
+# funcn create reciprocal matrix  --------------
+fun_recipr_contmatr <- function(C_m_full,age_group_sizes){
+  all_perms=permutations(n=nrow(C_m_full),r=2,repeats.allowed=T)
+  N_tot=sum(age_group_sizes)
+  C_m_full_symm=matrix(0,nrow=nrow(C_m_full),ncol=nrow(C_m_full))
+  for (k in 1:nrow(all_perms)) { 
+    i=all_perms[k,1]; j=all_perms[k,2]
+    C_m_full_symm[i,j]=(C_m_full[i,j] + C_m_full[j,i]*(age_group_sizes[j]/age_group_sizes[i]))/2
+  }
+  colnames(C_m_full_symm)=colnames(C_m_full); rownames(C_m_full_symm)=rownames(C_m_full) 
+  C_m_full_symm
+}
+

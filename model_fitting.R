@@ -16,7 +16,7 @@ length_lim_val=8; low_thresh_val=0.5; up_thresh_val=0.75
 sel_variable_val=c("value","positivity")[2]
 df_epid_threshold <- fcn_identify_seasons(
   df_input = df_posit_sel_cntrs %>% 
-                filter(ISO_WEEKSTARTDATE>=as.Date("2010-03-01") & ISO_WEEKSTARTDATE<=as.Date("2020-03-01")) %>%
+                filter(ISO_WEEKSTARTDATE>=as.Date("2010-01-01") & ISO_WEEKSTARTDATE<=as.Date("2020-04-01")) %>%
                 group_by(country,ISO_YEAR,ISO_WEEK,ISO_WEEKSTARTDATE,cluster_name,STRAIN,metasource) %>%
                 summarise(SPEC_PROCESSED_NB=sum(SPEC_PROCESSED_NB),value=sum(value)) %>% ungroup(),
   sel_variable=sel_variable_val, source_varname="metasource",
@@ -38,7 +38,7 @@ p <- df_epid_threshold %>%
   geom_rect(data=df_epid_lims, aes(xmin=start_date,xmax=end_date,fill=metasource,ymin=min_val,ymax=max_val),alpha=1/4) +
   theme_bw() + standard_theme + theme(legend.position="top",strip.text=element_text(size=13)) + 
   guides(color=guide_legend(nrow=2))
-if (y_log_flag) {p<-p+ scale_y_log10()}; p
+if (y_log_flag) {p<-p+ scale_y_log10(expand=expansion(0.01,0))}; p
 # SAVE
 ggsave(paste0("output/plots/epid_identif/",ifelse(n_sel>1,"ALT_CNTRS/",""),
               "low_thresh",low_thresh_val, "_up_thresh",up_thresh_val,
@@ -48,13 +48,71 @@ ggsave(paste0("output/plots/epid_identif/",ifelse(n_sel>1,"ALT_CNTRS/",""),
 }
 
 ### ### ### ### ### ### ### ### ### ### ### ### 
-# make a list of the epidemics, aggregated by:
-# - country
-# - data source (metasource)
-# - strain
+# list of epidemics
 
-df_epid_threshold
+# there are no epidemics identified based on sentinel data only, 
+# so lets use the season limits from the nonsentinel (this includes nonsentinel and notdefined in FluNet)
+# because this has higher counts, more years etc
 
+# df_epid_lims %>% filter(metasource %in% "NONSENT")
+
+# lets first do fitting for 1 country, 1 strain, 1 datatype
+data_fitting <- df_epid_threshold %>% 
+  filter(country %in% "Canada" & STRAIN %in% "INF_A" & metasource %in% "NONSENT") %>%
+  select(!c(flu_peak,over_peak,flu_included,over_inclusion,seq))
+if (all(data_fitting$epidem_inclusion==(data_fitting$epid_index>0))) {
+  data_fitting <- data_fitting %>% select(!epidem_inclusion)}
+
+# df_epid_lims %>% filter(country %in% "Canada" & STRAIN %in% "INF_A" & metasource %in% "NONSENT")
+
+### ### ### ### ### ### ### ### ### ### ### ### 
+# obtain contact matrices and aggregate to our age groups:
+# [0-5), [5-18), [18-65), [65-]
+
+# load CONTACT MATRICES from [Prem 2021]
+# https://github.com/kieshaprem/synthetic-contact-matrices/tree/master/output/syntheticmatrices
+load("data/contact_all.rdata"); # setdiff(ls(), existing_objects)
+# matrices as `contact_all$GHA`
+df_cntr_table = data.frame(country=unique(df_posit_sel_cntrs$country),
+                          COUNTRY_CODE=unique(df_posit_sel_cntrs$COUNTRY_CODE)) %>%
+                mutate(country_sub=case_when(
+                  COUNTRY_CODE %in% "UK" ~ "GBR",
+                  COUNTRY_CODE %in% "AUS" ~ "NZL", TRUE ~ COUNTRY_CODE))
+# extract matrices from `contact_all`
+cm_list <- lapply(df_cntr_table$country_sub, function(x) contact_all[[x]])
+names(cm_list) <- df_cntr_table$country
+
+# standard_age_groups <- fun_cntr_agestr(country_sel,i_year="2020",seq(0,75,5),c(seq(4,74,5),99))
+# popul_struct=fcn_cntr_fullpop(n_year="2020",country_sel)
+# # RSV age groups (population data from wpp2019)
+# rsv_age_groups <- fun_rsv_agegroups(standard_age_groups,popul_struct,
+#                                     rsv_age_groups_low=c(0,0.5,1,1.5, 2,3,4, 5,15, 45, 65),
+#                                     rsv_age_group_sizes=c(rep(0.4,4),rep(0.9,3), 9, 29, 19, 34))
+# # rsv_age_groups$value=rsv_age_groups$value*67e6/sum(rsv_age_groups$value)
+# ons_2020_midyear_estimates_uk <- read_csv(here::here("repo_data/ons_2020_midyear_estimates_uk.csv")) %>% 
+#   mutate(age_num=as.numeric(gsub("\\+","",age)))
+# low_inds<-findInterval(rsv_age_groups$age_low,ons_2020_midyear_estimates_uk$age_num)
+# high_inds <- findInterval(rsv_age_groups$age_low+rsv_age_groups$duration-0.1,
+#                           ons_2020_midyear_estimates_uk$age_num)
+# rsv_age_groups$value <- unlist(lapply(1:length(low_inds), 
+#         function(x) sum(ons_2020_midyear_estimates_uk$value[low_inds[x]:high_inds[x]])*ifelse(rsv_age_groups$duration[x]<1,
+#                                                         rsv_age_groups$duration[x],1) ))
+
+# modify contact matrix to correspond to our age groups
+C_m_merged_nonrecipr=fun_create_red_C_m(C_m_full=C_m_polymod,
+              model_agegroups=model_age_groups,
+              orig_age_groups_duration=standard_age_groups$duration,
+              orig_age_groups_sizes=standard_age_groups$values)
+# make it reciprocal for the larger group
+C_m=fun_recipr_contmatr(C_m_full = C_m_merged_nonrecipr,
+                        age_group_sizes = model_age_groups$stationary_popul)
+
+# only the UK is in polymod
+# list_CMs <- lapply(array(sel_cntrs_per_cluster), function(x)
+#                    contact_matrix(polymod, countries=x, age.limits = c(0, 5, 18, 65))$matrix,
+#                    symmetric=TRUE)
+# there are CMs for China and Thailand
+data.frame(list_surveys()) %>% filter(grepl(paste0(array(sel_cntrs_per_cluster),collapse="|"),title))
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 # # Engl ILI dataset

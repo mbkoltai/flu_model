@@ -430,7 +430,7 @@ flunet_data_UK_summed <- left_join(
                                        "United Kingdom",COUNTRY_AREA_TERRITORY),
          COUNTRY_CODE=ifelse(grepl("United Kingdom",COUNTRY_AREA_TERRITORY),"UK",COUNTRY_CODE)) %>%
   filter(COUNTRY_AREA_TERRITORY %in% gsub(", England","",unique(flu_ITZ_clusters$country_altern_name)) & 
-           ISO_YEAR>=2008 & ISO_WEEKSTARTDATE<as.Date("2020-03-01")) %>%
+           ISO_YEAR>=2008 & ISO_WEEKSTARTDATE<as.Date("2020-04-01")) %>%
   group_by(COUNTRY_AREA_TERRITORY,COUNTRY_CODE,ISO_YEAR,ISO_WEEK,ORIGIN_SOURCE) %>%
   summarise(INF_A=sum(INF_A),INF_B=sum(INF_B),SPEC_PROCESSED_NB=sum(SPEC_PROCESSED_NB),
             ISO_WEEKSTARTDATE=unique(ISO_WEEKSTARTDATE)) %>% ungroup(),
