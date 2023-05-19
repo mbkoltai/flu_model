@@ -106,14 +106,14 @@ fcn_identify_seasons <- function(df_input,sel_variable,source_varname="ORIGIN_SO
       filter(country %in% df_inds$country[k_row] & 
                                         STRAIN %in% df_inds$STRAIN[k_row] & 
                                         !!sym(source_varname) %in% sel_source_varname) %>%
-      mutate(flu_peak=quantile(value,probs=up_thresh),over_peak=F,
-             over_peak=flu_peak<value,
-             flu_included=quantile(value, probs=low_thresh),
-             over_inclusion=F, over_inclusion=flu_included<value,
+      mutate(flu_peak=quantile(value,probs=up_thresh), over_peak=F, over_peak=flu_peak<value,
+             flu_included=quantile(value, probs=low_thresh), 
+                    over_inclusion=F, over_inclusion=flu_included<value,
              seq_log=rep(rle(over_inclusion)$length>=length_lim,
-                         times=rle(over_inclusion)$length))
+             times=rle(over_inclusion)$length))
     if (print_flag){
-          print(paste0(paste0(dim(input_data),collapse = ", "),", ",paste0(df_inds[k_row,],collapse =", ")))
+          print(paste0( paste0(dim(input_data),collapse = ", "),", ",
+                        paste0(df_inds[k_row,],collapse =", ")) )
       }
     
     tmp <- rle(input_data$over_inclusion)
@@ -133,7 +133,11 @@ fcn_identify_seasons <- function(df_input,sel_variable,source_varname="ORIGIN_SO
     
     input_data$seq <- seq_to_add; input_data$epidem_inclusion <- 0
     for(j in 1:start_seq){
-      if (sum(input_data$over_peak[input_data$seq==j])>0) {
+      # any data points over the peak?
+      peak_detect <- sum(input_data$over_peak[input_data$seq==j])>0
+      # is the selected period at least `length_lim` weeks long?
+      length_detect <- sum(input_data$seq==j)>=length_lim
+      if (peak_detect&length_detect) {
         input_data$epidem_inclusion[input_data$seq==j]=1  }
     }
     
@@ -141,4 +145,17 @@ fcn_identify_seasons <- function(df_input,sel_variable,source_varname="ORIGIN_SO
   }
   
   return(bind_rows(list_cntr_epid_incl))
+}
+
+
+### ### ### ### ### ### 
+fcn_find_bloc_lims <- function(df_cont_data,log_flag=T) {
+  df_cont_data %>% group_by(country) %>% 
+  mutate(min_val=ifelse(log_flag,1,min(value)),max_val=max(value)) %>%
+  group_by(country,metasource,STRAIN) %>% mutate(block=cumsum(epidem_inclusion == 0)) %>%
+  filter(epidem_inclusion==1) %>%
+  group_by(country,metasource,STRAIN,block) %>%
+  summarize(start_date=min(ISO_WEEKSTARTDATE),end_date=max(ISO_WEEKSTARTDATE),
+            min_val=unique(min_val),max_val=max(max_val)) %>%
+    mutate(country=ifelse(grepl("King",country),"UK",country))
 }

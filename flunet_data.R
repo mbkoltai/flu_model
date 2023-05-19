@@ -592,11 +592,12 @@ for (k_method in c("kmeans_cluster","hi_cluster_ward")) {
       # cluster median
       geom_line(data=cluster_mean_median, aes(x=ISO_WEEK,y=median_all,group=STRAIN_SOURCE),color="black") +
       facet_grid(STRAIN_SOURCE~cluster_name,scales="free_y") + 
-      geom_text(data=df_cntrs_clusters,
-                aes(x=5+nchar(country),y=ifelse(CI_50_FLAG,50,pos*0.9),label=country),show.legend=FALSE) +
+      geom_text(data=df_cntrs_clusters,aes(x=5+nchar(country),y=ifelse(CI_50_FLAG,50,pos*0.9),
+                label=country),show.legend=FALSE) +
       scale_color_manual(values=strain_metasource_colors) + scale_fill_manual(values=strain_metasource_colors) + 
       scale_x_continuous(expand=expansion(0.01,0)) + scale_y_continuous(expand=expansion(0.02,0)) + 
-      ggtitle(k_method) + guides(color=guide_legend(ncol=2)) + labs(color="") + ylab(paste0("positivity (%, median)")) +
+      ggtitle(k_method) + guides(color=guide_legend(ncol=2)) + 
+      labs(color="") + ylab(paste0("positivity (%, median)")) +
       theme_bw() + standard_theme + 
       theme(legend.position="top",legend.text=element_text(size=12),title=element_text(size=17))
     
