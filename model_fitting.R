@@ -61,13 +61,14 @@ data_fitting <- df_epid_threshold %>%
   filter(country %in% "Canada" & STRAIN %in% "INF_A" & metasource %in% "NONSENT") %>%
   select(!c(flu_peak,over_peak,flu_included,over_inclusion,seq))
 if (all(data_fitting$epidem_inclusion==(data_fitting$epid_index>0))) {
-  data_fitting <- data_fitting %>% select(!epidem_inclusion)}
+  data_fitting <- data_fitting %>% select(!epidem_inclusion)   }
 
 # df_epid_lims %>% filter(country %in% "Canada" & STRAIN %in% "INF_A" & metasource %in% "NONSENT")
 
 ### ### ### ### ### ### ### ### ### ### ### ### 
-# obtain contact matrices and aggregate to our age groups:
-# [0-5), [5-18), [18-65), [65-]
+# get contact matrices and aggregate to our age groups:
+# [0-5), [5-20), [20-65), [65-]
+library(socialmixr)
 
 # load CONTACT MATRICES from [Prem 2021]
 # https://github.com/kieshaprem/synthetic-contact-matrices/tree/master/output/syntheticmatrices
@@ -82,37 +83,40 @@ df_cntr_table = data.frame(country=unique(df_posit_sel_cntrs$country),
 cm_list <- lapply(df_cntr_table$country_sub, function(x) contact_all[[x]])
 names(cm_list) <- df_cntr_table$country
 
-# standard_age_groups <- fun_cntr_agestr(country_sel,i_year="2020",seq(0,75,5),c(seq(4,74,5),99))
-# popul_struct=fcn_cntr_fullpop(n_year="2020",country_sel)
-# # RSV age groups (population data from wpp2019)
-# rsv_age_groups <- fun_rsv_agegroups(standard_age_groups,popul_struct,
-#                                     rsv_age_groups_low=c(0,0.5,1,1.5, 2,3,4, 5,15, 45, 65),
-#                                     rsv_age_group_sizes=c(rep(0.4,4),rep(0.9,3), 9, 29, 19, 34))
-# # rsv_age_groups$value=rsv_age_groups$value*67e6/sum(rsv_age_groups$value)
-# ons_2020_midyear_estimates_uk <- read_csv(here::here("repo_data/ons_2020_midyear_estimates_uk.csv")) %>% 
-#   mutate(age_num=as.numeric(gsub("\\+","",age)))
-# low_inds<-findInterval(rsv_age_groups$age_low,ons_2020_midyear_estimates_uk$age_num)
-# high_inds <- findInterval(rsv_age_groups$age_low+rsv_age_groups$duration-0.1,
-#                           ons_2020_midyear_estimates_uk$age_num)
-# rsv_age_groups$value <- unlist(lapply(1:length(low_inds), 
-#         function(x) sum(ons_2020_midyear_estimates_uk$value[low_inds[x]:high_inds[x]])*ifelse(rsv_age_groups$duration[x]<1,
-#                                                         rsv_age_groups$duration[x],1) ))
+# aggregate into our age groups
+age_limits <- c(0,5,20,65); age_group_names <- paste0(age_limits,"-", c(age_limits[2:length(age_limits)],99))
+# contact_matrix(age.limits = age_limits)
+
+# with socialmixr
+# orig_agegroups <- colnames(readRDS("data/UK_contact_matrix_sum.RDS"))
+# xx <- as.numeric(gsub("\\+","",unlist(lapply(orig_agegroups, function(x) strsplit(x, split ="-")[[1]][1]))))
+# cm_polymod_uk <- contact_matrix(polymod, countries="United Kingdom", age.limits=xx)$matrix
+# cm_polymod_uk_merged <- contact_matrix(polymod, countries="United Kingdom", age.limits = c(0, 5, 20,65))$matrix
+
+# we need popul by our age groups
+for (sel_cntr in df_cntr_table$country) {
+# age group sizes we need (pop_age from socialmixr)
+model_age_groups <- data.frame(agegroup_name=age_group_names, duration=diff(c(age_limits,120)), 
+                               wpp_agegroup_low=c(1,2,5,14), wpp_agegroup_high=c(1,4,13,16),
+                               popul=pop_age(wpp_age(sel_cntr, 2015), age.limit = age_limits)$population)
+# age group population sizes corresponding to [Prem 2021] matrices
+standard_age_groups <- fun_cntr_agestr(i_cntr = sel_cntr,i_year="2015",
+                              age_low_vals = seq(0,75,5),age_high_vals = c(seq(4,74,5),120))
 
 # modify contact matrix to correspond to our age groups
-C_m_merged_nonrecipr=fun_create_red_C_m(C_m_full=C_m_polymod,
-              model_agegroups=model_age_groups,
-              orig_age_groups_duration=standard_age_groups$duration,
-              orig_age_groups_sizes=standard_age_groups$values)
+sel_cntr_code <- df_cntr_table$country_sub[df_cntr_table$country %in% sel_cntr]
+C_m_merged_nonrecipr <- fun_create_red_C_m(C_m_full=list(cm_polymod_uk,contact_all[[sel_cntr_code]])[[2]],
+                                        model_agegroups=model_age_groups,
+                                        orig_age_groups_duration=standard_age_groups$duration,
+                                        orig_age_groups_sizes=standard_age_groups$values)
 # make it reciprocal for the larger group
-C_m=fun_recipr_contmatr(C_m_full = C_m_merged_nonrecipr,
-                        age_group_sizes = model_age_groups$stationary_popul)
+if (!exists("list_contact_matr")) { list_contact_matr <- list()}
+list_contact_matr[[sel_cntr]] <- fun_recipr_contmatr(C_m_full = C_m_merged_nonrecipr,
+                        age_group_sizes = model_age_groups$popul)
+}
 
-# only the UK is in polymod
-# list_CMs <- lapply(array(sel_cntrs_per_cluster), function(x)
-#                    contact_matrix(polymod, countries=x, age.limits = c(0, 5, 18, 65))$matrix,
-#                    symmetric=TRUE)
-# there are CMs for China and Thailand
-data.frame(list_surveys()) %>% filter(grepl(paste0(array(sel_cntrs_per_cluster),collapse="|"),title))
+
+write_rds(list_contact_matr,"output/list_contact_matr.RDS")
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 # # Engl ILI dataset
