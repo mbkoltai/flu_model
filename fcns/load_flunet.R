@@ -4,7 +4,6 @@ flunet_data <- read_csv("data/VIW_FNT.csv")
 cntr_pop_2020 = pop[-(1:29),] %>% select(name,`2020`) %>% rename(pop_size=`2020`) %>% 
   mutate(pop_size=round(pop_size/1e3,2)) %>% rename(COUNTRY_AREA_TERRITORY=name)
 
-
 flu_ITZ_clusters <- read_csv("data/flu_ITZ_clusters.csv") %>% 
   pivot_longer(cols=c(kmeans_cluster_name,hi_cluster_ward_name),
                names_to="method",values_to="cluster_name") %>%

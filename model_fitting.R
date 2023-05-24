@@ -93,12 +93,12 @@ age_limits <- c(0,5,20,65); age_group_names <- paste0(age_limits,"-", c(age_limi
 # cm_polymod_uk <- contact_matrix(polymod, countries="United Kingdom", age.limits=xx)$matrix
 # cm_polymod_uk_merged <- contact_matrix(polymod, countries="United Kingdom", age.limits = c(0, 5, 20,65))$matrix
 
-# we need popul by our age groups
+# we need popul sizes by our age groups
 for (sel_cntr in df_cntr_table$country) {
 # age group sizes we need (pop_age from socialmixr)
 model_age_groups <- data.frame(agegroup_name=age_group_names, duration=diff(c(age_limits,120)), 
                                wpp_agegroup_low=c(1,2,5,14), wpp_agegroup_high=c(1,4,13,16),
-                               popul=pop_age(wpp_age(sel_cntr, 2015), age.limit = age_limits)$population)
+                               popul=pop_age(wpp_age(sel_cntr, 2015), age.limit=age_limits)$population)
 # age group population sizes corresponding to [Prem 2021] matrices
 standard_age_groups <- fun_cntr_agestr(i_cntr = sel_cntr,i_year="2015",
                               age_low_vals = seq(0,75,5),age_high_vals = c(seq(4,74,5),120))
@@ -117,6 +117,18 @@ list_contact_matr[[sel_cntr]] <- fun_recipr_contmatr(C_m_full = C_m_merged_nonre
 
 
 write_rds(list_contact_matr,"output/list_contact_matr.RDS")
+
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
+# fitting
+
+
+# fluEvidenceSynthesis::contact_matrix(polymod_data = contact_all$GBR,demography = model_age_groups$popul,
+#                                      age_group_limits=c(age_limits[2:4]))
+ag <- stratify_by_age(demography, limits=c(65)) # c( 43670500, 8262600 )
+population <- stratify_by_risk(ag, matrix(c(0.01,0.4),nrow=1), labels = c("LowRisk", "HighRisk")) 
+# c( 43233795, 4957560, 436705, 3305040)
+ag <- c(1000,1000)
+initial.infected <- stratify_by_risk( age_groups = ag, matrix(c(0.01,0.4),nrow=1)) # c(990, 600, 10, 400)
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 # # Engl ILI dataset
