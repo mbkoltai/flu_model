@@ -3,9 +3,6 @@ source("fcns/fcns.R")
 # load data
 source("fcns/load_flunet.R")
 
-# FluEvidenceSynthesis
-library(fluEvidenceSynthesis)
-
 # load filtered data
 n_sel=1
 df_posit_sel_cntrs <- read_csv(c("output/df_positivity_counts_sel_cntrs.csv",
@@ -13,7 +10,7 @@ df_posit_sel_cntrs <- read_csv(c("output/df_positivity_counts_sel_cntrs.csv",
 
 # IDENTIFY THE EPIDEMICS
 length_lim_val=8; low_thresh_val=0.5; up_thresh_val=0.75
-sel_variable_val=c("value","positivity")[2]
+sel_variable_val=c("value","positivity")[2] # value means counts
 df_epid_threshold <- fcn_identify_seasons(
   df_input = df_posit_sel_cntrs %>% 
                 filter(ISO_WEEKSTARTDATE>=as.Date("2010-01-01") & ISO_WEEKSTARTDATE<=as.Date("2020-04-01")) %>%
@@ -65,10 +62,13 @@ if (all(data_fitting$epidem_inclusion==(data_fitting$epid_index>0))) {
 
 # df_epid_lims %>% filter(country %in% "Canada" & STRAIN %in% "INF_A" & metasource %in% "NONSENT")
 
-### ### ### ### ### ### ### ### ### ### ### ### 
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
 # get contact matrices and aggregate to our age groups:
 # [0-5), [5-20), [20-65), [65-]
 library(socialmixr)
+# FluEvidenceSynthesis
+library(fluEvidenceSynthesis)
 
 # load CONTACT MATRICES from [Prem 2021]
 # https://github.com/kieshaprem/synthetic-contact-matrices/tree/master/output/syntheticmatrices
@@ -115,20 +115,48 @@ list_contact_matr[[sel_cntr]] <- fun_recipr_contmatr(C_m_full = C_m_merged_nonre
                         age_group_sizes = model_age_groups$popul)
 }
 
-
 write_rds(list_contact_matr,"output/list_contact_matr.RDS")
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
-# fitting
+# FITTING
 
 
-# fluEvidenceSynthesis::contact_matrix(polymod_data = contact_all$GBR,demography = model_age_groups$popul,
-#                                      age_group_limits=c(age_limits[2:4]))
 ag <- stratify_by_age(demography, limits=c(65)) # c( 43670500, 8262600 )
 population <- stratify_by_risk(ag, matrix(c(0.01,0.4),nrow=1), labels = c("LowRisk", "HighRisk")) 
 # c( 43233795, 4957560, 436705, 3305040)
-ag <- c(1000,1000)
-initial.infected <- stratify_by_risk( age_groups = ag, matrix(c(0.01,0.4),nrow=1)) # c(990, 600, 10, 400)
+initial.infected <- stratify_by_risk( age_groups = c(1000,1000), matrix(c(0.01,0.4),nrow=1)) # c(990, 600, 10, 400)
+# contact matrix
+# Polymod data is subdivided in seven age groups
+poly <- polymod_uk[,c(1,2,3,9)]
+poly[,3] <- rowSums(polymod_uk[,3:8])
+contacts <- fluEvidenceSynthesis::contact_matrix(polymod_data=as.matrix(poly), demography=demography,
+                                                 age_group_limits = c(65))
+susceptibility <- c( 0.7, 0.3 ) # Different for different ages
+transmissibility <- 0.17 # Same for all ages
+infection_delays <- c( 0.8, 1.8 ) # 0.8 and 1.8 day.
+
+# SIMULATE
+odes <- infectionODEs(population, initial.infected, vaccine_calendar, contact_matrix=contacts, 
+                       susceptibility, transmissibility, infection_delays, 7)
+head(odes %>% mutate_if(is.numeric, round) )
+
+# have CM as dataframe
+cm_polymod_format <- as.matrix( data.frame(list_contact_matr[[sel_cntr]]) %>%  
+  mutate(Age=rownames(list_contact_matr[[sel_cntr]]),Weekend=0) %>%
+  pivot_longer(!c(Age,Weekend)) %>% 
+  mutate(name=paste0("[",gsub(",99","+",gsub("\\.",",",gsub("X","",name))),")"),
+         Age=case_when(Age %in% "0-5" ~ 2.5,
+                       Age %in% "5-20" ~ 12.5,
+                       Age %in% "20-65" ~ 42.5,
+                       Age %in% "65-99" ~ 75)) %>%
+  pivot_wider(names_from = name,values_from = value) )
+
+yr_res_pop <- unlist(lapply(pop_age(wpp_age(sel_cntr, 2015))$population/5, function(x) rep(x,5)))
+contacts <- fluEvidenceSynthesis::contact_matrix(polymod_data=cm_polymod_format,
+                                                 demography=yr_res_pop,
+                                                 age_group_limits = c(5,20,65))
+
+contacts*matrix(rep(pop_age(wpp_age(sel_cntr, 2015), age.limit=age_limits)$population,4),nrow=4,byrow=T)
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 # # Engl ILI dataset

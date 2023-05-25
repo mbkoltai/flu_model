@@ -2,6 +2,7 @@
 # FluNet data
 
 # load libraries, functions
+# this file loads libraries and some custom-made functions
 source("fcns/fcns.R")
 
 # LOAD DATA
@@ -11,8 +12,13 @@ flunet_data <- read_csv("data/VIW_FNT.csv")
 cntr_pop_2020 = pop[-(1:29),] %>% select(name,`2020`) %>% rename(pop_size=`2020`) %>% 
   mutate(pop_size=round(pop_size/1e3,2)) %>% rename(COUNTRY_AREA_TERRITORY=name)
 
+
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
+# PLOT #1
+### This plots shows number of positive samples per year per country
+# 
 # number of datapoints or mean positives (by year) by COUNTRY, YEAR, ORIGIN_SOURCE
-# source_colors <- c("NOTDEFINED"="#F8766D","NONSENTINEL"="#00BA38","SENTINEL"="#619CFF")
+# mycolors <- c("NOTDEFINED"="#F8766D","NONSENTINEL"="#00BA38","SENTINEL"="#619CFF")
 k_var=1; pop_lim=20
 for (k_reg in unique(flunet_data$WHOREGION)) {
   plot_var=c("mean_inf_all","n_data")[k_var]
@@ -27,7 +33,7 @@ p <- ff %>% ggplot(aes(x=ISO_YEAR,y=get(plot_var),fill=ORIGIN_SOURCE)) +
   geom_bar(stat="identity",position=position_dodge(preserve="single"),color="black",size=1/3,width=8/10) + 
   facet_wrap(~COUNTRY_AREA_TERRITORY,scales = c("free_y","fixed")[k_var]) + 
   scale_y_continuous(expand=expansion(mult=0.02)) + scale_x_continuous(breaks=2008:2019,expand=expansion(add=0.3)) + 
-  scale_fill_manual(values=mycolors) + xlab("") + ylab(c("mean # positives","# datapoints")[k_var]) +
+  xlab("") + ylab(c("mean # positives","# datapoints")[k_var]) + # scale_fill_manual(values=mycolors) + 
   theme_bw() + standard_theme + geom_vline(xintercept=(2008:2019)+1/2,size=1/3) # unique(flunet_data$WHOREGION)
 if (k_var==1) {p <- p + geom_point(data=dummy_df,aes(x=ISO_YEAR,y=yvar),color=NA,fill=NA)}; p
 # save
@@ -35,6 +41,8 @@ ggsave(paste0("output/datasource_stats/lt_",pop_lim,"m_pop/",
               c("mean_detects","datapoint")[k_var],"/",k_reg,"_by_source_year",".png"),
          width=36,height=18,units="cm")
 }
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
+
 
 #####
 # time courses
@@ -42,7 +50,8 @@ ggsave(paste0("output/datasource_stats/lt_",pop_lim,"m_pop/",
 # number of specimens received vs processed
 cor(flunet_data$SPEC_RECEIVED_NB, flunet_data$SPEC_PROCESSED_NB,use = "complete.obs")
 
-
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
+# PLOT #2
 # time courses, data source types by diff colors
 source_colors <- c("NOTDEFINED"="#F8766D","NONSENTINEL"="#00BA38","SENTINEL"="#619CFF")
 pop_lim=20; flag_positivity=T
@@ -91,14 +100,14 @@ for (k_reg in unique(flunet_data$WHOREGION)) {
 }
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
-
+# PLOT #3
 # time course of # positives by ISO_WEEK, years overlaid, cntrs on facets FOR ONE DATA SOURCE
 flag_positivity=T; pop_lim=20; start_end_yrs=c(2008,2019)
 varname <- ifelse(flag_positivity,"positivity","INF_ALL")
 for (var_source in c("SENTINEL","NONSENTINEL","NOTDEFINED")) {
 for (k_reg in unique(flunet_data$WHOREGION)) {
   # subset by region and data source
-  ff <- flunet_data %>% 
+  ff <- flunet_data %>%
            filter(COUNTRY_AREA_TERRITORY %in% (cntr_pop_2020 %>% filter(pop_size>=pop_lim))$COUNTRY_AREA_TERRITORY & 
            ISO_YEAR>=start_end_yrs[1] & ISO_YEAR<=start_end_yrs[2] & ISO_WEEK<=52 & 
            (WHOREGION %in% k_reg) & (ORIGIN_SOURCE %in% var_source) & SPEC_PROCESSED_NB>2)
@@ -138,7 +147,10 @@ ggsave(paste0("output/plots/",ifelse(flag_positivity,"positivity","incidence"),"
 }
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
 # Explore by STRAIN
+
+# some calculations on correlations btwn different variables
 View(flunet_data %>% select(COUNTRY_AREA_TERRITORY,ISO_YEAR,ISO_WEEK,contains(c("AH","SUBTYP","INF"))) %>% 
        arrange(COUNTRY_AREA_TERRITORY,ISO_YEAR,ISO_WEEK))
 # is INF_A + INF_B=INF_ALL? 99.99% correlated, so effectively yes
@@ -150,9 +162,12 @@ cor(flunet_data$INF_A,flunet_data$AOTHER_SUBTYPE+
 cor(flunet_data$INF_B, flunet_data$BVIC_2DEL+flunet_data$BVIC_3DEL+flunet_data$BNOTDETERMINED+
     flunet_data$BVIC_NODEL+flunet_data$BVIC_DELUNK+flunet_data$BYAM,use="complete.obs")
 
-# plot by strains
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
+# PLOT #4
+# Separated by strain (colour coding), also by data source (ORIGIN_SOURCE), 
+# but sources are not colour-coded. Thicker lines are means per STRAIN-ORIGIN_SOURCE
 strain_colors <- c("INF_A"="#F8766D","INF_B"="#00BA38")
-pop_lim=10
+pop_lim=20
 filt_countrs <- (cntr_pop_2020 %>% filter(pop_size>=pop_lim))$COUNTRY_AREA_TERRITORY
 varname=c("positivity","value")[1]
 for (k_reg in unique(flunet_data$WHOREGION)) {
@@ -197,6 +212,8 @@ for (k_reg in unique(flunet_data$WHOREGION)) {
          width=36,height=18,units="cm")
 }
 
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
+# these are some calculations on correlation btwn columns in FluNet data
 # all flu samples (negatives incl.)
 flunet_data %>%
   ggplot() + geom_point(aes(x=INF_ALL,y=INF_NEGATIVE,color=COUNTRY_AREA_TERRITORY),alpha=1/2) + 
@@ -225,6 +242,7 @@ sum(!is.na(flunet_data$INF_NEGATIVE) & !is.na(flunet_data$INF_B))/nrow(flunet_da
 #   scale_x_continuous(breaks=(0:13)*4) + theme_bw() + standard_theme
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
 # clustering: from Chen 2023 (https://doi.org/10.1016/j.ijid.2023.02.002)
 
 flu_ITZ_clusters <- read_csv("data/flu_ITZ_clusters.csv") %>% 
@@ -234,14 +252,18 @@ flu_ITZ_clusters <- read_csv("data/flu_ITZ_clusters.csv") %>%
          method=gsub("_name","",method)) %>% 
   select(!c(kmeans_cluster_num,hi_cluster_ward_num))
 
-# correct naming inconsistencies...
+# calling this file to correct naming inconsistencies...
 source("fcns/flu_ITZ_naming.R")
 
-# PLOT by STRAIN + by clusters
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
+# PLOT #5
+# PLOT by STRAIN + by clusters: separated by strain and data source, each plot shows one ITZ
+
 strain_colors <- c("INF_A (NOTDEFINED)"="#F8766D","INF_A (NONSENTINEL)"="darkred",
                    "INF_B (NOTDEFINED)"="#00BA38","INF_B (NONSENTINEL)"="darkgreen")
-# "INF_A (NOTDEFINED)"  "INF_B (NOTDEFINED)"  "INF_A (NONSENTINEL)" "INF_B (NONSENTINEL)"
+# plot positivity or counts (in the dataframe called `value`)
 varname=c("positivity","value")[1]
+# these are the 2 clustering methods used in https://doi.org/10.1016/j.ijid.2023.02.002 paper
 k_method=c("kmeans_cluster","hi_cluster_ward")[2]
 for (k_reg in unique(flu_ITZ_clusters$cluster_name)) {
   # cntrs in cluster
@@ -292,8 +314,8 @@ for (k_reg in unique(flu_ITZ_clusters$cluster_name)) {
 }
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###  
+# PLOT #6
 # show all curves for a cluster in the same panel, all clusters on the same plot
-
 strain_colors <- c("INF_A (NOTDEF)"="#F8766D","INF_A (NONSENT)"="darkred","INF_A (SENT)"="orange",
                    "INF_B (NOTDEF)"="#00BA38","INF_B (NONSENT)"="darkgreen","INF_B (SENT)"="turquoise")
 # show positivity (not number counts)
@@ -302,13 +324,15 @@ varname=c("positivity","value")[1]
 for (k_method in c("kmeans_cluster","hi_cluster_ward")){ # [1]
 
 subset_flunet <- left_join(flunet_data %>%
-  filter(COUNTRY_AREA_TERRITORY %in% flu_ITZ_clusters$country_altern_name & ISO_YEAR>=2008 & ISO_YEAR<2020), 
+  filter(COUNTRY_AREA_TERRITORY %in% flu_ITZ_clusters$country_altern_name & 
+           ISO_YEAR>=2008 & ISO_YEAR<2020),
   flu_ITZ_clusters %>% filter(method %in% k_method) %>% 
     select(country_altern_name,cluster_name) %>% 
     rename(COUNTRY_AREA_TERRITORY=country_altern_name)) %>%
   group_by(COUNTRY_AREA_TERRITORY,ISO_YEAR,ORIGIN_SOURCE) %>% 
   filter(mean(INF_ALL,na.rm=T)>1) %>% ungroup() %>%
-  select(COUNTRY_AREA_TERRITORY,ISO_YEAR,ISO_WEEK,ORIGIN_SOURCE,INF_A,INF_B,SPEC_PROCESSED_NB,cluster_name) %>% 
+  select(COUNTRY_AREA_TERRITORY,ISO_YEAR,ISO_WEEK,ORIGIN_SOURCE,
+         INF_A,INF_B,SPEC_PROCESSED_NB,cluster_name) %>% 
   pivot_longer(c(INF_A,INF_B),names_to="STRAIN") %>%
   mutate(positivity=value/SPEC_PROCESSED_NB,
          STRAIN_SOURCE=paste0(STRAIN," (",gsub("DEFINED","DEF",gsub("SENTINEL","SENT",ORIGIN_SOURCE)),")")) %>%
@@ -346,7 +370,8 @@ ggsave(paste0("output/plots/cluster/",k_method,"/",
        width=36,height=24,units="cm")
 }
 
-### ### ### ### ### ### ### ### ### ### ### ### 
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
+# PLOT #7
 # show variation and min/max instead of individual curves
 
 # only CI50?
@@ -438,8 +463,9 @@ flunet_data_UK_summed <- left_join(
     rename(COUNTRY_AREA_TERRITORY=country_altern_name) %>% unique() ) %>% 
   mutate(country=ifelse(COUNTRY_AREA_TERRITORY %in% "United Kingdom","United Kingdom",country))
   
-
-for (k_method in c("kmeans_cluster","hi_cluster_ward")) { # [2]
+# PLOT #8
+# calculate number of years with data per country per data source
+for (k_method in c("kmeans_cluster","hi_cluster_ward")) {
 # how many years of data by ITZ + average # of tests?
 data_by_ITZ <-  left_join(
       flunet_data_UK_summed, 
@@ -505,7 +531,8 @@ ggsave(paste0("output/plots/cluster/summary_stats/",k_method,"_",sel_datametric,
        width=36,height=24,units="cm")
 }
 
-### ### ### ### ### ### 
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
+# PLOT #9
 # plot selected countries vs. their cluster's mean/median
 n_sel <- c(1,2)[1]
 sel_cntrs_per_cluster <- c("Africa"=c("Ghana","South Africa")[n_sel],
@@ -622,48 +649,47 @@ for (k_method in c("kmeans_cluster","hi_cluster_ward")) {
 }
 }
 
+# GO TO the file model_fitting.R (same folder)
+
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
-
-
-### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
-# fluID
-
-fluID <- read_csv("data/VIW_FID_EPI.csv")
-
-flu_ID_summ_stats <- fluID[,1:27] %>% 
-  pivot_longer(!c(WHOREGION,FLUSEASON,HEMISPHERE,ITZ,COUNTRY_CODE,COUNTRY_AREA_TERRITORY,
-  ISO_WEEKSTARTDATE,ISO_YEAR,ISO_WEEK,MMWR_WEEKSTARTDATE,MMWR_YEAR,MMWR_WEEK,ORIGIN_SOURCE,AGEGROUP_CODE)) %>%
-  group_by(WHOREGION,COUNTRY_AREA_TERRITORY,name) %>% 
-  summarise(value=sum(!is.na(value)),n_year=length(unique(ISO_YEAR))) %>% filter(value>0)
-
-View(flu_ID_summ_stats %>% filter(grepl(paste(array(sel_cntrs_per_cluster), collapse = "|"), COUNTRY_AREA_TERRITORY)))
-
-# view data
-fluID %>% filter(grepl(paste(c(array(sel_cntrs_per_cluster),"Türkiye"),collapse="|"), COUNTRY_AREA_TERRITORY)) %>%
-  select(COUNTRY_AREA_TERRITORY,ISO_YEAR,ISO_WEEK,ILI_CASES)
-
-# plot ILI
-fluID %>% filter(grepl(paste(c(array(sel_cntrs_per_cluster),"Türkiye"),collapse="|"), COUNTRY_AREA_TERRITORY) & 
-                   !is.na(ILI_CASES) & !AGEGROUP_CODE %in% "UNKNOWN") %>%
-  group_by(COUNTRY_AREA_TERRITORY,AGEGROUP_CODE) %>% mutate(n_year=n_distinct(ISO_YEAR)) %>% filter(n_year>4) %>%
-  ggplot() + facet_wrap(COUNTRY_AREA_TERRITORY~AGEGROUP_CODE,scales="free_y") + 
-  geom_line(aes(x=ISO_WEEK,y=ILI_CASES,colour=ISO_YEAR,group=ISO_YEAR)) + 
-  theme_bw() + standard_theme
-
-# plot ILI outpatient
+# # fluID
+# 
+# fluID <- read_csv("data/VIW_FID_EPI.csv")
+# 
+# flu_ID_summ_stats <- fluID[,1:27] %>% 
+#   pivot_longer(!c(WHOREGION,FLUSEASON,HEMISPHERE,ITZ,COUNTRY_CODE,COUNTRY_AREA_TERRITORY,
+#   ISO_WEEKSTARTDATE,ISO_YEAR,ISO_WEEK,MMWR_WEEKSTARTDATE,MMWR_YEAR,MMWR_WEEK,ORIGIN_SOURCE,AGEGROUP_CODE)) %>%
+#   group_by(WHOREGION,COUNTRY_AREA_TERRITORY,name) %>% 
+#   summarise(value=sum(!is.na(value)),n_year=length(unique(ISO_YEAR))) %>% filter(value>0)
+# 
+# View(flu_ID_summ_stats %>% filter(grepl(paste(array(sel_cntrs_per_cluster), collapse = "|"), COUNTRY_AREA_TERRITORY)))
+# 
+# # view data
+# fluID %>% filter(grepl(paste(c(array(sel_cntrs_per_cluster),"Türkiye"),collapse="|"), COUNTRY_AREA_TERRITORY)) %>%
+#   select(COUNTRY_AREA_TERRITORY,ISO_YEAR,ISO_WEEK,ILI_CASES)
+# 
+# # plot ILI
 # fluID %>% filter(grepl(paste(c(array(sel_cntrs_per_cluster),"Türkiye"),collapse="|"), COUNTRY_AREA_TERRITORY) & 
-#                    !is.na(ILI_OUTPATIENTS) & ILI_OUTPATIENTS>0 & !AGEGROUP_CODE %in% "UNKNOWN") %>%
+#                    !is.na(ILI_CASES) & !AGEGROUP_CODE %in% "UNKNOWN") %>%
 #   group_by(COUNTRY_AREA_TERRITORY,AGEGROUP_CODE) %>% mutate(n_year=n_distinct(ISO_YEAR)) %>% filter(n_year>4) %>%
 #   ggplot() + facet_wrap(COUNTRY_AREA_TERRITORY~AGEGROUP_CODE,scales="free_y") + 
-#   geom_line(aes(x=ISO_WEEK,y=ILI_OUTPATIENTS,colour=ISO_YEAR,group=ISO_YEAR)) + theme_bw() + standard_theme
-
-# plot SARI
-fluID %>% filter(grepl(paste(array(sel_cntrs_per_cluster),"Türkiye",collapse="|"), COUNTRY_AREA_TERRITORY) & 
-                   !is.na(SARI_CASES) & !AGEGROUP_CODE %in% "UNKNOWN") %>%
-  group_by(COUNTRY_AREA_TERRITORY,AGEGROUP_CODE) %>% mutate(n_year=n_distinct(ISO_YEAR)) %>% filter(n_year>4) %>%
-  ggplot(aes(x=ISO_WEEK,y=SARI_CASES,colour=ISO_YEAR,group=ISO_YEAR)) + 
-  facet_wrap(COUNTRY_AREA_TERRITORY~AGEGROUP_CODE,scales="free_y") + 
-  geom_line() + theme_bw() + standard_theme
+#   geom_line(aes(x=ISO_WEEK,y=ILI_CASES,colour=ISO_YEAR,group=ISO_YEAR)) + 
+#   theme_bw() + standard_theme
+# 
+# # plot ILI outpatient
+# # fluID %>% filter(grepl(paste(c(array(sel_cntrs_per_cluster),"Türkiye"),collapse="|"), COUNTRY_AREA_TERRITORY) & 
+# #                    !is.na(ILI_OUTPATIENTS) & ILI_OUTPATIENTS>0 & !AGEGROUP_CODE %in% "UNKNOWN") %>%
+# #   group_by(COUNTRY_AREA_TERRITORY,AGEGROUP_CODE) %>% mutate(n_year=n_distinct(ISO_YEAR)) %>% filter(n_year>4) %>%
+# #   ggplot() + facet_wrap(COUNTRY_AREA_TERRITORY~AGEGROUP_CODE,scales="free_y") + 
+# #   geom_line(aes(x=ISO_WEEK,y=ILI_OUTPATIENTS,colour=ISO_YEAR,group=ISO_YEAR)) + theme_bw() + standard_theme
+# 
+# # plot SARI
+# fluID %>% filter(grepl(paste(array(sel_cntrs_per_cluster),"Türkiye",collapse="|"), COUNTRY_AREA_TERRITORY) & 
+#                    !is.na(SARI_CASES) & !AGEGROUP_CODE %in% "UNKNOWN") %>%
+#   group_by(COUNTRY_AREA_TERRITORY,AGEGROUP_CODE) %>% mutate(n_year=n_distinct(ISO_YEAR)) %>% filter(n_year>4) %>%
+#   ggplot(aes(x=ISO_WEEK,y=SARI_CASES,colour=ISO_YEAR,group=ISO_YEAR)) + 
+#   facet_wrap(COUNTRY_AREA_TERRITORY~AGEGROUP_CODE,scales="free_y") + 
+#   geom_line() + theme_bw() + standard_theme
 
 
 
