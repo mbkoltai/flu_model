@@ -4,11 +4,14 @@ source("fcns/fcns.R")
 source("fcns/load_flunet.R")
 
 # load filtered data
+# this csv file is saved version of `df_posit_sel_cntrs` dataframe in the flunet_data.R file
 n_sel=1
 df_posit_sel_cntrs <- read_csv(c("output/df_positivity_counts_sel_cntrs.csv",
                                  "output/df_positivity_counts_sel_cntrs_ALTERN.csv")[n_sel])
 
+# PLOT #1
 # IDENTIFY THE EPIDEMICS
+# set thresholds (length of season, lower and upper percentiles to include as an epidemic)
 length_lim_val=8; low_thresh_val=0.5; up_thresh_val=0.75
 sel_variable_val=c("value","positivity")[2] # value means counts
 df_epid_threshold <- fcn_identify_seasons(
@@ -46,14 +49,12 @@ ggsave(paste0("output/plots/epid_identif/",ifelse(n_sel>1,"ALT_CNTRS/",""),
 
 ### ### ### ### ### ### ### ### ### ### ### ### 
 # list of epidemics
-
+#
 # there are no epidemics identified based on sentinel data only, 
 # so lets use the season limits from the nonsentinel (this includes nonsentinel and notdefined in FluNet)
 # because this has higher counts, more years etc
 
-# df_epid_lims %>% filter(metasource %in% "NONSENT")
-
-# lets first do fitting for 1 country, 1 strain, 1 datatype
+# lets first subset data for 1 country, 1 strain, 1 datatype ---> fitting 
 data_fitting <- df_epid_threshold %>% 
   filter(country %in% "Canada" & STRAIN %in% "INF_A" & metasource %in% "NONSENT") %>%
   select(!c(flu_peak,over_peak,flu_included,over_inclusion,seq))
@@ -64,7 +65,7 @@ if (all(data_fitting$epidem_inclusion==(data_fitting$epid_index>0))) {
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
-# get contact matrices and aggregate to our age groups:
+# Get contact matrices and aggregate to our age groups:
 # [0-5), [5-20), [20-65), [65-]
 library(socialmixr)
 # FluEvidenceSynthesis
@@ -72,8 +73,8 @@ library(fluEvidenceSynthesis)
 
 # load CONTACT MATRICES from [Prem 2021]
 # https://github.com/kieshaprem/synthetic-contact-matrices/tree/master/output/syntheticmatrices
-load("data/contact_all.rdata"); # setdiff(ls(), existing_objects)
-# matrices as `contact_all$GHA`
+load("data/contact_all.rdata") 
+# matrices are `contact_all$GHA` ...
 df_cntr_table = data.frame(country=unique(df_posit_sel_cntrs$country),
                           COUNTRY_CODE=unique(df_posit_sel_cntrs$COUNTRY_CODE)) %>%
                 mutate(country_sub=case_when(
