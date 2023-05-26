@@ -1,7 +1,18 @@
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 # FITTING
+# we are using built-in fitting algorithm of FluEvSynthesis
+# and building on the existing script of Thailand paper at 
+# https://github.com/NaomiWaterlow/NextGen_Flu_Thai/blob/main/Fitting/run_inference.R
 
-# individual simulations in fluEvidenceSynthesis
+# incidence DATA is in 
+df_posit_sel_cntrs
+
+# 4x4 contact matrices are in `list_contact_matr` also save as RDS file in
+list_contact_matr< - readRDS("output/list_contact_matr.RDS")
+# this is a list with the countries as names: names(list_contact_matr)
+
+# how to do individual simulations in fluEvidenceSynthesis?
+# from https://blackedder.github.io/flu-evidence-synthesis/modelling.html
 ag <- stratify_by_age(demography, limits=c(65)) # c( 43670500, 8262600 )
 population <- stratify_by_risk(ag, matrix(c(0.01,0.4),nrow=1), labels = c("LowRisk", "HighRisk")) 
 # c( 43233795, 4957560, 436705, 3305040)
@@ -58,9 +69,9 @@ polymod_uk_aggreg <- polymod_uk %>% select(!Weekend) %>%
     Age >=65 ~ age_group_names[4]),levels=age_group_names)) %>% 
   group_by(Age_group,contact_Age_group) %>%
   summarise(value=mean(value)) %>% # group_by(contact_Age_group) %>% 
-  mutate(contact_ag_broad=
-           factor(age_group_names[findInterval(as.numeric(factor(contact_Age_group,
-                                                                 levels=colnames(polymod_uk)[3:9])),vec=c(3,5,7))+1],levels=age_group_names) ) %>%
+  mutate(contact_ag_broad=factor(age_group_names[findInterval(as.numeric(
+                            factor(contact_Age_group,levels=colnames(polymod_uk)[3:9])),
+                            vec=c(3,5,7))+1], levels=age_group_names) ) %>%
   group_by(Age_group,contact_ag_broad) %>% summarise(value=sum(value)) %>% 
   arrange(Age_group,contact_ag_broad) %>% pivot_wider(names_from=contact_ag_broad,values_from=value) %>%
   column_to_rownames(var="Age_group") 

@@ -33,9 +33,11 @@ p <- df_epid_threshold %>%
   ggplot() + facet_grid(country~STRAIN,scales="free_y") + 
   geom_line(aes(x=ISO_WEEKSTARTDATE,y=value,group=metasource,colour=factor(source_epid))) + 
   xlab("") + ylab("# positive tests") + labs(colour="epidemic",fill="") +
-  scale_color_manual(values=c("grey32","red","grey46","darkred")) + scale_fill_manual(values=c("red","darkred")) +
+  scale_color_manual(values=c("grey32","red","grey46","darkred")) + 
+  scale_fill_manual(values=c("red","darkred")) +
   scale_x_date(date_labels="%Y\n%m",breaks="6 month",expand=expansion(0.01,0))  +
-  geom_rect(data=df_epid_lims, aes(xmin=start_date,xmax=end_date,fill=metasource,ymin=min_val,ymax=max_val),alpha=1/4) +
+  geom_rect(data=df_epid_lims, aes(xmin=start_date,xmax=end_date,
+                                   fill=metasource,ymin=min_val,ymax=max_val),alpha=1/4) +
   theme_bw() + standard_theme + theme(legend.position="top",strip.text=element_text(size=13)) + 
   guides(color=guide_legend(nrow=2))
 if (y_log_flag) {p<-p+ scale_y_log10(expand=expansion(0.01,0))}; p
