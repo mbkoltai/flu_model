@@ -21,7 +21,10 @@ df_epid_threshold <- fcn_identify_seasons(
                 summarise(SPEC_PROCESSED_NB=sum(SPEC_PROCESSED_NB),value=sum(value)) %>% ungroup(),
   sel_variable=sel_variable_val, source_varname="metasource",
   low_thresh=low_thresh_val,up_thresh = up_thresh_val,length_lim=length_lim_val)
-# identify limits of epidemics
+# save
+write_csv(df_epid_threshold,file = "output/df_epid_threshold.csv")
+
+# PLOTTING epidemics
 for (y_log_flag in c(T,F)) {
 df_epid_lims <- fcn_find_bloc_lims(df_epid_threshold,log_flag=y_log_flag)
 

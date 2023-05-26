@@ -649,7 +649,7 @@ for (k_method in c("kmeans_cluster","hi_cluster_ward")) {
 }
 }
 
-# GO TO the file model_fitting.R (same folder)
+# GO TO `epid_identif_cont_matrs.R` (same folder) for identifying epidemics and creating contact matrices
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
 # # fluID
