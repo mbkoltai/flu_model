@@ -1,5 +1,3 @@
-
-
 custom_inference <- function(input_demography, vaccine_calendar, input_polymod, ili = NULL, 
                              mon_pop = NULL, n_pos, n_samples, initial, mapping,
                              nbatch, nburn, blen) {

@@ -17,7 +17,7 @@ df_epid_threshold <- read_csv(file="output/df_epid_threshold.csv")
 df_epid_lims
 
 # 4x4 contact matrices are in `list_contact_matr` also save as RDS file in
-list_contact_matr< - readRDS("output/list_contact_matr.RDS")
+list_contact_matr <- readRDS("output/list_contact_matr.RDS")
 # this is a list with the countries as names: names(list_contact_matr)
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
@@ -74,22 +74,22 @@ polymod_uk_aggreg <- polymod_uk %>% select(!Weekend) %>%
 # vs 'our' contact matrix
 round(list_contact_matr$`United Kingdom`,2)
 
-inference.results <- inference(demography = demography,
-                               vaccine_calendar = vaccine_calendar,
-                               polymod_data = as.matrix(polymod_FluEv),
-                               ili = ili_df$ili,
-                               mon_pop = ili_df$total.monitored,
-                               n_pos = confirmed.samples_df$positive,
-                               n_samples = confirmed.samples_df$total.samples,
-                               initial = initial_parameters,
-                               age_groups = c(65),
-                               nbatch = 1000,
-                               nburn = 1000, blen = 5)
+# inference.results <- inference(demography = demography,
+#                                vaccine_calendar = vaccine_calendar,
+#                                polymod_data = as.matrix(polymod_FluEv),
+#                                ili = ili_df$ili,
+#                                mon_pop = ili_df$total.monitored,
+#                                n_pos = confirmed.samples_df$positive,
+#                                n_samples = confirmed.samples_df$total.samples,
+#                                initial = initial_parameters,
+#                                age_groups = c(65),
+#                                nbatch = 1000,
+#                                nburn = 1000, blen = 5)
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### 
 # INFERENCE
 # from https://github.com/NaomiWaterlow/NextGen_Flu_Thai/blob/main/Fitting/run_inference.R
-
+#
 # we need our contact matrices in this format: as.matrix(polymod_FluEv)
 
 # have ContMatrix as dataframe
@@ -125,7 +125,9 @@ data_fitting <- df_epid_threshold %>%
   filter(grepl("NONSENT",metasource) & country %in% sel_cntr & STRAIN %in% "INF_A") %>%
   select(!c(over_peak,flu_included,over_inclusion,positivity,flu_peak,seq))
 # we will want to do this for multiple epidemics, but for now lets select one
-df_start_end <- (df_epid_lims %>% ungroup() %>% filter(index==1 & grepl("NONSENT",metasource) & STRAIN %in% "INF_A" & 
+epidemic_to_run <- 1
+df_start_end <- (df_epid_lims %>% ungroup() %>% 
+                   filter(index==epidemic_to_run & grepl("NONSENT",metasource) & STRAIN %in% "INF_A" & 
           (country %in% ifelse(grepl("King",sel_cntr),"UK",sel_cntr))))[,c("start_date","end_date")]
 dates_to_run <- c(df_start_end$start_date,df_start_end$end_date)
 # vacc calendar (no fitting in the vaccination)
@@ -135,10 +137,45 @@ vaccine_calendar <- as_vaccination_calendar(efficacy = rep(0,length(age_group_na
                                                               ncol = length(age_group_names)), 
                                             no_age_groups = length(age_group_names), no_risk_groups=1)
 # create a list of the epidemics
-epidemics_to_fit <- list(
-  
-  list(start = as.Date("2006-04-01"), 
-       end = as.Date("2006-12-31"),
-       initial_params = c(-10.8, 10, 0.6, 3, 0, 0), 
-       data_points = unlist(fluAH1_epidemics[13:21,"flu"]), 
-       type = "AH1N1"), )
+# from https://github.com/NaomiWaterlow/NextGen_Flu_Thai/blob/main/Fitting/epidemics.R
+epidemics_to_fit <- list()
+for (epid_index_val in unique(data_fitting$epid_index[data_fitting$epidem_inclusion>0])) {
+  xx <- data_fitting %>% filter(epid_index %in% epid_index_val)
+  epidemics_to_fit[[epid_index_val]] <- list(start=min(xx$ISO_WEEKSTARTDATE),
+                                           end = max(xx$ISO_WEEKSTARTDATE),
+                                           initial_params = c(-10.8, 10, 0.6, 3, 0, 0),
+                                           data_points = xx$value,
+                                           type = "A")
+}
+
+initial_parameters <- epidemics_to_fit[[epidemic_to_run]]$initial_params
+names(initial_parameters) <- c("reporting", "transmissibility","susceptibility","initial_infected")
+
+##### Run the fit #####
+
+tic()
+set.seed(seed_to_use)
+
+# this function needs to be rewritten in "fcns/inference_function.R"
+output <- custom_inference(input_demography = yr_res_pop, 
+                  vaccine_calendar = vaccine_calendar, 
+                  input_polymod = contacts_matrixformat, # here i'm not sure if we need the matrix format or long format
+                  ili = NULL, 
+                  mon_pop = NULL, 
+                           n_pos = epidemics_to_fit[[epidemic_to_run]]$data_points,
+                           n_samples = NULL,
+                           initial = initial_parameters,
+                           mapping = NULL, 
+                           nbatch = post_size, 
+                           nburn = burn_in, 
+                           blen = thinning_steps)
+
+
+output_list <- list (
+  epidemic_ran = epidemic_to_run,
+  posterior = output, 
+  post_size = post_size, 
+  thinning_steps = thinning_steps, 
+  burn_in = burn_in, 
+  seed = seed_to_use
+)
