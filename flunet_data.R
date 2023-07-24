@@ -94,7 +94,7 @@ for (k_reg in unique(flunet_data$WHOREGION)) {
     scale_color_manual(values=source_colors) + scale_x_continuous(expand=expansion(0.01,0)) + 
     ylab(ifelse(flag_positivity,"positivity","# positives")) +  theme_bw() + standard_theme
   # save
-  ggsave(paste0("output/plots/",ifelse(positivity,"positivity/","incidence/"),
+  ggsave(paste0("output/plots/",ifelse(flag_positivity,"positivity/","incidence/"),
                 "source_color_code/lt_",pop_lim,"M/",k_reg,"_by_datasource",".png"),
          width=36,height=18,units="cm")
 }

@@ -98,30 +98,30 @@ age_limits <- c(0,5,20,65); age_group_names <- paste0(age_limits,"-", c(age_limi
 # xx <- as.numeric(gsub("\\+","",unlist(lapply(orig_agegroups, function(x) strsplit(x, split ="-")[[1]][1]))))
 # cm_polymod_uk <- contact_matrix(polymod, countries="United Kingdom", age.limits=xx)$matrix
 # cm_polymod_uk_merged <- contact_matrix(polymod, countries="United Kingdom", age.limits = c(0, 5, 20,65))$matrix
-
-# we need popul sizes by our age groups
-for (sel_cntr in df_cntr_table$country) {
-# age group sizes we need (pop_age from socialmixr)
-model_age_groups <- data.frame(agegroup_name=age_group_names, duration=diff(c(age_limits,120)), 
-                               wpp_agegroup_low=c(1,2,5,14), wpp_agegroup_high=c(1,4,13,16),
-                               popul=pop_age(wpp_age(sel_cntr, 2015), age.limit=age_limits)$population)
-# age group population sizes corresponding to [Prem 2021] matrices
-standard_age_groups <- fun_cntr_agestr(i_cntr = sel_cntr,i_year="2015",
-                              age_low_vals = seq(0,75,5),age_high_vals = c(seq(4,74,5),120))
-
-# modify contact matrix to correspond to our age groups
-sel_cntr_code <- df_cntr_table$country_sub[df_cntr_table$country %in% sel_cntr]
-C_m_merged_nonrecipr <- fun_create_red_C_m(C_m_full=list(cm_polymod_uk,contact_all[[sel_cntr_code]])[[2]],
-                                        model_agegroups=model_age_groups,
-                                        orig_age_groups_duration=standard_age_groups$duration,
-                                        orig_age_groups_sizes=standard_age_groups$values)
-# make it reciprocal for the larger group
-if (!exists("list_contact_matr")) { list_contact_matr <- list()}
-list_contact_matr[[sel_cntr]] <- fun_recipr_contmatr(C_m_full = C_m_merged_nonrecipr,
-                        age_group_sizes = model_age_groups$popul)
-}
-
-write_rds(list_contact_matr,"output/list_contact_matr.RDS")
+# 
+# # we need popul sizes by our age groups
+# for (sel_cntr in df_cntr_table$country) {
+# # age group sizes we need (pop_age from socialmixr)
+# model_age_groups <- data.frame(agegroup_name=age_group_names, duration=diff(c(age_limits,120)), 
+#                                wpp_agegroup_low=c(1,2,5,14), wpp_agegroup_high=c(1,4,13,16),
+#                                popul=pop_age(wpp_age(sel_cntr, 2015), age.limit=age_limits)$population)
+# # age group population sizes corresponding to [Prem 2021] matrices
+# standard_age_groups <- fun_cntr_agestr(i_cntr = sel_cntr,i_year="2015",
+#                               age_low_vals = seq(0,75,5),age_high_vals = c(seq(4,74,5),120))
+# 
+# # modify contact matrix to correspond to our age groups
+# sel_cntr_code <- df_cntr_table$country_sub[df_cntr_table$country %in% sel_cntr]
+# C_m_merged_nonrecipr <- fun_create_red_C_m(C_m_full=list(cm_polymod_uk,contact_all[[sel_cntr_code]])[[2]],
+#                                         model_agegroups=model_age_groups,
+#                                         orig_age_groups_duration=standard_age_groups$duration,
+#                                         orig_age_groups_sizes=standard_age_groups$values)
+# # make it reciprocal for the larger group
+# if (!exists("list_contact_matr")) { list_contact_matr <- list()}
+# list_contact_matr[[sel_cntr]] <- fun_recipr_contmatr(C_m_full = C_m_merged_nonrecipr,
+#                         age_group_sizes = model_age_groups$popul)
+# }
+# 
+# write_rds(list_contact_matr,"output/list_contact_matr.RDS")
 
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###

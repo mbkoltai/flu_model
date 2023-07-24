@@ -4,6 +4,11 @@
 # and building on the existing script of Thailand paper at 
 # https://github.com/NaomiWaterlow/NextGen_Flu_Thai/blob/main/Fitting/run_inference.R
 
+# source functions, call libraries
+source("fcns/inference_function.R")
+source("fcns/prior_distribution_specification.R")
+source("fcns/gen_seeiir_ag_vacc_waning.R")
+
 # incidence data from FluNet for selected countries are in
 # the 'metasource' column is from merging the "NOTDEFINED" and "NONSENTINEL" columns,
 # in most countries we only have "NOTDEFINED", and in Europe often only "NONSENTINEL",
@@ -37,13 +42,13 @@ transmissibility <- 0.17 # Same for all ages
 infection_delays <- c( 0.8, 1.8 ) # 0.8 and 1.8 day.
 
 # SIMULATE
-odes <- infectionODEs(population, initial.infected, vaccine_calendar, contact_matrix=contacts, 
-                      susceptibility, transmissibility, infection_delays, 7)
-head(odes %>% mutate_if(is.numeric, round) )
-# % infected
-fraction.infected <- odes %>%
-  gather(Group, Incidence, -Time) %>%
-  mutate(fraction = Incidence/population[Group])
+# odes <- infectionODEs(population, initial.infected, vaccine_calendar, contact_matrix=contacts, 
+#                       susceptibility, transmissibility, infection_delays, 7)
+# head(odes %>% mutate_if(is.numeric, round) )
+# # % infected
+# fraction.infected <- odes %>%
+#   gather(Group, Incidence, -Time) %>%
+#   mutate(fraction = Incidence/population[Group])
 
 
 # contact matrix data from FluEvSynth
@@ -113,69 +118,168 @@ yr_res_pop <- unlist(lapply(pop_age(wpp_age(sel_cntr, 2015))$population/5, funct
 # but not working yet
 ###### things to specify #####
 
-epidemic_to_run <- 2 # we want to fit jointly instead!
-post_size <- 10000
-thinning_steps <- 100
-burn_in <- 100000
-seed_to_use <- 55
+library(data.table)
+
+# epidemic_to_run <- 2 # we want to fit jointly instead!
+post_size <- 10 #3000
+thinning_steps <- 10 #100
+burn_in <- 100 #100000
+seed_to_use <- 55 #99
 save <- T
 
 # lets first subset data for one country and NONSENT data only
 data_fitting <- df_epid_threshold %>% 
   filter(grepl("NONSENT",metasource) & country %in% sel_cntr & STRAIN %in% "INF_A") %>%
   select(!c(over_peak,flu_included,over_inclusion,positivity,flu_peak,seq))
-# we will want to do this for multiple epidemics, but for now lets select one
-epidemic_to_run <- 1
-df_start_end <- (df_epid_lims %>% ungroup() %>% 
-                   filter(index==epidemic_to_run & grepl("NONSENT",metasource) & STRAIN %in% "INF_A" & 
-          (country %in% ifelse(grepl("King",sel_cntr),"UK",sel_cntr))))[,c("start_date","end_date")]
-dates_to_run <- c(df_start_end$start_date,df_start_end$end_date)
-# vacc calendar (no fitting in the vaccination)
-vaccine_calendar <- as_vaccination_calendar(efficacy = rep(0,length(age_group_names)), 
-                                            dates = dates_to_run,
-                                            coverage = matrix(0,nrow=3, # length(dates_to_run), 
-                                                              ncol = length(age_group_names)), 
-                                            no_age_groups = length(age_group_names), no_risk_groups=1)
+
+# # we will want to do this for multiple epidemics, but for now lets select one
+# epidemic_to_run <- 1
+# 
+# df_start_end <- (
+#   df_epid_lims %>% ungroup() %>% 
+#     filter(index==epidemic_to_run & grepl("NONSENT",metasource) & STRAIN %in% "INF_A" & 
+#         (country %in% ifelse(grepl("King",sel_cntr),"UK",sel_cntr))))[,c("start_date","end_date")]
+# 
+# dates_to_run <- c(df_start_end$start_date,df_start_end$end_date)
+# dates_to_run[2] <- dates_to_run[2] + 7 # need end date to be the date AFTER the last week we want to model
+# 
+# # vacc calendar (no fitting in the vaccination)
+# vaccine_calendar <- as_vaccination_calendar(
+#   efficacy = rep(0,length(age_group_names)), 
+#   dates = dates_to_run,
+#   coverage = matrix(
+#     0, nrow=3, # length(dates_to_run), 
+#     ncol = length(age_group_names)), 
+#   no_age_groups = length(age_group_names), 
+#   no_risk_groups=1
+# )
+
 # create a list of the epidemics
 # from https://github.com/NaomiWaterlow/NextGen_Flu_Thai/blob/main/Fitting/epidemics.R
 epidemics_to_fit <- list()
 for (epid_index_val in unique(data_fitting$epid_index[data_fitting$epidem_inclusion>0])) {
   xx <- data_fitting %>% filter(epid_index %in% epid_index_val)
-  epidemics_to_fit[[epid_index_val]] <- list(start=min(xx$ISO_WEEKSTARTDATE),
-                                           end = max(xx$ISO_WEEKSTARTDATE),
-                                           initial_params = c(-10.8, 10, 0.6, 3, 0, 0),
-                                           data_points = xx$value,
-                                           type = "A")
+  epidemics_to_fit[[epid_index_val]] <- list(
+    start=min(xx$ISO_WEEKSTARTDATE),
+    end = max(xx$ISO_WEEKSTARTDATE),
+    initial_params = c(-8, 10, 0.4, 4, 0, 0), #c(-10, 9, 0.6, 3, 0, 0),#
+    data_points = xx$value,
+    type = "A"
+  )
 }
 
-initial_parameters <- epidemics_to_fit[[epidemic_to_run]]$initial_params
-names(initial_parameters) <- c("reporting", "transmissibility","susceptibility","initial_infected")
+# epidemics_to_fit <- epidemics_to_fit[1:3]
+
+dates_to_run <- list()
+for(epid_index_val in 1:length(epidemics_to_fit)){
+  dates_to_run[[epid_index_val]] <- c(
+    epidemics_to_fit[[epid_index_val]]$start,
+    epidemics_to_fit[[epid_index_val]]$end + 7 # need end date to be the date AFTER the last week we want to model
+  )
+}
+# dates_to_run <- as.Date(dates_to_run,origin="1970-01-01")
+
+# vacc calendar (no fitting in the vaccination)
+vaccine_calendar_list <- list()
+for(epid_index_val in 1:length(epidemics_to_fit)){ 
+  vaccine_calendar_list[[epid_index_val]] <- as_vaccination_calendar(
+    efficacy = rep(0,length(age_group_names)),
+    dates = dates_to_run[[epid_index_val]],
+    coverage = matrix(
+      0, 
+      nrow = 3, #length(dates_to_run[[epid_index_val]]),
+      ncol = length(age_group_names)
+    ),
+    no_age_groups = length(age_group_names),
+    no_risk_groups=1
+  )
+}
+
+initial_parameters <- list()
+for(epid_index_val in 1:length(epidemics_to_fit)){ 
+  initial_parameters[[epid_index_val]] <- epidemics_to_fit[[epid_index_val]]$initial_params
+  names(initial_parameters[[epid_index_val]]) <- c("reporting", "transmissibility","susceptibility","initial_infected")
+}
+# initial_parameters <- unlist(initial_parameters) #needed if passing in for multiple epidemics
 
 ##### Run the fit #####
 
-tic()
+output_list <- vector("list",length(epidemics_to_fit))
+# for (epidemic_to_run in 1:length(epidemics_to_fit)){ # fit epidemics one at a time in loop for the moment
+for (epidemic_to_run in 2:2){
 set.seed(seed_to_use)
+  
+# this calls "fcns/inference_function.R"
+global_index <- 1
+output <- custom_inference(
+  input_demography = yr_res_pop, 
+  vaccine_calendar_list = vaccine_calendar_list, 
+  input_polymod = contacts_matrixformat, # here i'm not sure if we need the matrix format or long format
+  ili = NULL, 
+  mon_pop = NULL, 
+  # n_pos = epidemics_to_fit[[epidemic_to_run]]$data_points,
+  epidemics_to_fit =  epidemics_to_fit[epidemic_to_run], #epidemics_to_fit, # passing in all the epidemics instead of n_pos
+  n_samples = NULL,
+  initial = initial_parameters[[epidemic_to_run]], #initial_paramters,
+  mapping = NULL, 
+  nbatch = post_size, 
+  nburn = burn_in, 
+  blen = thinning_steps
+  )
 
-# this function needs to be rewritten in "fcns/inference_function.R"
-output <- custom_inference(input_demography = yr_res_pop, 
-                  vaccine_calendar = vaccine_calendar, 
-                  input_polymod = contacts_matrixformat, # here i'm not sure if we need the matrix format or long format
-                  ili = NULL, 
-                  mon_pop = NULL, 
-                           n_pos = epidemics_to_fit[[epidemic_to_run]]$data_points,
-                           n_samples = NULL,
-                           initial = initial_parameters,
-                           mapping = NULL, 
-                           nbatch = post_size, 
-                           nburn = burn_in, 
-                           blen = thinning_steps)
-
-
-output_list <- list (
-  epidemic_ran = epidemic_to_run,
-  posterior = output, 
-  post_size = post_size, 
-  thinning_steps = thinning_steps, 
-  burn_in = burn_in, 
+output_list[[epidemic_to_run]] <- list (
+  epidemic_no = epidemic_to_run,
+  posterior = output,
+  post_size = post_size,
+  thinning_steps = thinning_steps,
+  burn_in = burn_in,
   seed = seed_to_use
 )
+
+
+}
+
+
+# colnames(output_list$posterior$batch) <- c("reporting", "transmissibility", "sus1",
+#                                            "infected", "blank", "blank")
+# post_samples <- data.table(output_list$posterior$batch)
+# # remove the blank ones
+# post_samples[, blank := NULL ]
+# post_samples[, blank := NULL ]
+# # add the likelihoods
+# post_samples[, ll := output_list$posterior$llikelihoods]
+# post_samples$timestep <- 1:nrow(post_samples)
+# post_samples_m <- melt.data.table(post_samples, id.vars = "timestep")
+
+# post_samples <- data.table(output$batch)
+# # colnames(post_samples) <- rep(c("reporting","trans","sus","infected","blank","blank"),length(epidemics_to_fit))
+# colnames(post_samples) <- paste0(c("reporting","trans","sus","infected","blank","blank"),"_",rep(1:length(epidemics_to_fit),each=6))
+# # remove the blank ones
+# cols_to_delete <- which(names(post_samples) %like% "blank") 
+# post_samples[, (cols_to_delete) := NULL ]
+# # add the likelihoods
+# post_samples[, ll := output$llikelihoods]
+# post_samples$timestep <- 1:nrow(post_samples)
+# 
+# post_samples_m <- melt.data.table(post_samples, id.vars = "timestep")
+# 
+# post_samples_m[, c("variable", "epidemic_id") := tstrsplit(variable, "_", fixed = TRUE)]
+
+
+
+
+
+
+
+DENSITY <- ggplot(post_samples_m) + 
+  facet_grid(epidemic_id~variable, scales="free" ) +
+  geom_histogram(aes(x=value), bins=50) + 
+  labs(title = paste0("Epidemic posterior parameters"))
+DENSITY
+
+
+TRACE_THINNED <- ggplot(post_samples_m, aes(x = timestep, y = value)) + 
+  facet_grid(variable~epidemic_id, scales = "free_y") + 
+  geom_line() + 
+  labs(title = paste0("Epidemic ID"))
+TRACE_THINNED
